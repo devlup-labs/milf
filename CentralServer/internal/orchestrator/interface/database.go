@@ -5,7 +5,7 @@ import (
 )
 
 type Database interface {
-	GetLambda(
+	GetLambdaMetadata(
 		ctx context.Context,
 		funcID string,
 	) (map[string]string, error)

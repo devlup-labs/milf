@@ -8,5 +8,5 @@ type QueueService interface {
 		jobID string,
 		funcID string,
 		metaData map[string]string,
-	) error
+	) (error, bool)
 }

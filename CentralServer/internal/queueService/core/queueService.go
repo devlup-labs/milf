@@ -2,6 +2,9 @@ package core
 
 import (
 	"central_server/internal/queueService/domain"
+	"central_server/utils"
+	"context"
+	"fmt"
 	"strconv"
 	"sync"
 )
@@ -31,18 +34,36 @@ func NewQueueService() *QueueService {
 		}
 }
 
-func (s *QueueService)Enqueue(jobID, funcID string, metaData map[string]string) (error, bool){
-	maxRam, err:= strconv.Atoi(metaData["maxRam"])
-	if(err != nil){
+func (s *QueueService)Enqueue(ctx context.Context, jobID string, funcID string, metaData map[string]string) (error, bool){
+	   maxRam, err := strconv.Atoi(metaData["maxRam"])
+	   if err != nil {
+		   utils.Error("Failed to parse maxRam: " + err.Error())
+		   return err, false
+	   }
+
+	   job, err := domain.NewJob(jobID, funcID, metaData)
+	   if err != nil {
+		   utils.Error("Failed to create job: " + err.Error())
+		   return err, false
+	   }
+
+	   queue := s.selector.SelectQueue(*s.pool, maxRam)
+	   if queue == nil {
+		   utils.Error("No suitable queue found for jobID: " + jobID)
+		   return fmt.Errorf("No suitable queue found"), false
+	   }
+
+	   err = queue.AddJob(job)
+	   if err != nil {
+		   utils.Error("Failed to add job to queue: " + err.Error())
+		   return err, false
+	   }
+	   utils.Info("Job enqueued successfully: " + jobID + " in queue: " + queue.QueueID)
+	   err = job.UpdateStatus(domain.JobQueued)
+	if err != nil {
+		fmt.Println(err)
 		return err, false
 	}
-	job, err := domain.NewJob(jobID, funcID, metaData)
-	if(err != nil){
-		return err, false
-	}
-	queue := s.selector.SelectQueue(*s.pool, maxRam)
-	queue.AddJob(job)
-	job.UpdateStatus(domain.JobQueued)
 	s.mu.Lock()
 	s.jobIndex[jobID] = queue.QueueID
 	s.mu.Unlock()

@@ -2,6 +2,7 @@ package core
 
 import (
 	interfaces "central_server/internal/orchestrator/interface"
+	"central_server/utils"
 	"context"
 	"errors"
 
@@ -31,44 +32,48 @@ func NewOrchestrator(db interfaces.Database, gate interfaces.FuncGateway, queue 
 }
 
 func (o *Orchestrator) ActivateService(ctx context.Context, funcID string) (bool, error) {
-	funcMetaData, err := o.Database.GetLambda(ctx, funcID)
-	if(err!=nil){
-		return false, err
-	}
-	if(funcMetaData["status"] != "compiled"){
-		return false, errors.New("Lambda function is not compiled")
-	}
-	_, err = o.Gateway.ActivateJob(funcID, funcMetaData["user_id"])
-	if(err!=nil){
-		return false, err
-	}
-	o.Funcs[funcID] = funcMetaData
-	o.Activated[funcID] = true
-	return true, nil
+	   funcMetaData, err := o.Database.GetLambdaMetadata(ctx, funcID)
+	   if err != nil {
+		   return false, err
+	   }
+	   if funcMetaData["status"] != "compiled" {
+		   return false, errors.New("Lambda function is not compiled")
+	   }
+	   _, err = o.Gateway.ActivateJob(funcID, funcMetaData["user_id"])
+	   if err != nil {
+		   return false, err
+	   }
+	   o.Funcs[funcID] = funcMetaData
+	   o.Activated[funcID] = true
+	   utils.Info("Activated service for funcID: " + funcID)
+	   return true, nil
 }
 
 func (o *Orchestrator) DeactivateService(funcID string) (bool, error) {
-	_, err := o.Gateway.DeactivateJob(funcID, "")
-	if err != nil {
-		return false, err
-	}
-	delete(o.Activated, funcID)
-	delete(o.Funcs, funcID)
-	return true, nil
+	   _, err := o.Gateway.DeactivateJob(funcID, "")
+	   if err != nil {
+		   return false, err
+	   }
+	   delete(o.Activated, funcID)
+	   delete(o.Funcs, funcID)
+	   utils.Info("Deactivated service for funcID: " + funcID)
+	   return true, nil
 }
 
 func (o* Orchestrator) ReceiveTrigger(ctx context.Context, trigID string, funcID string, input string) (bool, error) {
-	jobID := uuid.New().String()
-	metaData, exists := o.Funcs[funcID]
-	if !exists {
-		return false, errors.New("Function not activated")
-	}
-	o.trigJob[jobID]=trigID
-	err := o.QueueService.Enqueue(ctx, jobID, funcID, metaData)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	   jobID := uuid.New().String()
+	   metaData, exists := o.Funcs[funcID]
+	   if !exists {
+		   return false, errors.New("Function not activated")
+	   }
+	   o.trigJob[jobID] = trigID
+	   err, ack := o.QueueService.Enqueue(ctx, jobID, funcID, metaData)
+	   if err != nil {
+		   utils.Error("Failed to enqueue job for funcID: " + funcID + ", trigID: " + trigID + ", error: " + err.Error())
+		   return false, err
+	   }
+	   utils.Info("Trigger received and job enqueued for funcID: " + funcID + ", trigID: " + trigID + ", jobID: " + jobID)
+	   return ack, nil
 }
 
 
