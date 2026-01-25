@@ -9,9 +9,6 @@ import (
 	gwcore "central_server/internal/gateway/core"
 	gwhandler "central_server/internal/gateway/handler"
 	gwinterfaces "central_server/internal/gateway/interfaces"
-	sinkcore "central_server/internal/sinkManager/core"
-	sinkhandler "central_server/internal/sinkManager/handler"
-	sinkinterfaces "central_server/internal/sinkManager/interfaces"
 	"central_server/internal/storage"
 )
 
@@ -29,35 +26,13 @@ func main() {
 
 	lambdaService := gwcore.NewLambdaService(lambdaRepo, execRepo, compiler, orchestrator)
 	lambdaHandler := gwhandler.NewLambdaHandler(lambdaService)
-	gatewayRouter := gwinterfaces.NewRouter(lambdaHandler, authHandler.AuthMiddleware)
-
-	// SinkManager
-	sinkRepo := storage.NewMemorySinkRepo()
-	taskRepo := storage.NewMemoryTaskRepo()
-	resultRepo := storage.NewMemoryTaskResultRepo()
-	sinkClient := storage.DummySinkClient{}
-
-	sinkService := sinkcore.NewSinkManagerService(sinkRepo, taskRepo, resultRepo, sinkClient, nil, "dev-secret")
-	sinkHandler := sinkhandler.NewSinkHandler(sinkService)
-	sinkRouter := sinkinterfaces.NewRouter(sinkHandler, authHandler.AuthMiddleware)
+	router := gwinterfaces.NewRouter(lambdaHandler, authHandler.AuthMiddleware)
 
 	// Routes
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
-
-	// Mount gateway routes
-	gatewayMux := gatewayRouter.Setup()
-	mux.Handle("/api/v1/lambdas", gatewayMux)
-	mux.Handle("/api/v1/lambdas/", gatewayMux)
-	mux.Handle("/api/v1/executions/", gatewayMux)
-	mux.Handle("/health", gatewayMux)
-
-	// Mount sink manager routes
-	sinkMux := sinkRouter.Setup()
-	mux.Handle("/api/v1/sinks", sinkMux)
-	mux.Handle("/api/v1/sinks/", sinkMux)
-	mux.Handle("/api/v1/tasks/", sinkMux)
+	mux.Handle("/", router.Setup())
 
 	addr := ":8080"
 	log.Printf("server listening on %s", addr)
