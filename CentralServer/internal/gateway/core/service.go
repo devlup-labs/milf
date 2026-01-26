@@ -31,7 +31,7 @@ func NewLambdaService(
 	}
 }
 
-//just for saving lambda in db using db ka interface
+// just for saving lambda in db using db ka interface
 func (s *LambdaService) StoreLambda(ctx context.Context, req *domain.LambdaStoreRequest) (*domain.LambdaStoreResponse, error) {
 	if err := domain.ValidateStoreRequest(req); err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (s *LambdaService) StoreLambda(ctx context.Context, req *domain.LambdaStore
 	lambda := &domain.Lambda{
 		ID:         uuid.New().String(),
 		Name:       req.Name,
-		SourceCode: req.SourceCode,
+		SourceCode: []byte(req.SourceCode),
 		Runtime:    req.Runtime,
 		MemoryMB:   req.MemoryMB,
 		RunType:    req.RunType,
@@ -67,7 +67,7 @@ func (s *LambdaService) StoreLambda(ctx context.Context, req *domain.LambdaStore
 	}, nil
 }
 
-//name this as Send trigger whihc will send a trigger to orchestrator to start the servcie
+// name this as Send trigger whihc will send a trigger to orchestrator to start the servcie
 func (s *LambdaService) ExecuteLambda(ctx context.Context, req *domain.LambdaExecRequest) (*domain.LambdaExecResponse, error) {
 	if err := domain.ValidateExecRequest(req); err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (s *LambdaService) ExecuteLambda(ctx context.Context, req *domain.LambdaExe
 		Status:      domain.ExecutionStatusPending,
 		StartedAt:   now,
 	}
-    //DOUBT:dekho isse bc
+	//DOUBT:dekho isse bc
 	if err := s.execRepo.Save(ctx, execution); err != nil {
 		return nil, domain.ErrInternalServer
 	}
@@ -120,7 +120,7 @@ func (s *LambdaService) GetLambda(ctx context.Context, lambdaID string) (*domain
 	return lambda, nil
 }
 
-//exec ka status ayega yaha pe hamare paas
+// exec ka status ayega yaha pe hamare paas
 func (s *LambdaService) GetExecution(ctx context.Context, executionID string) (*domain.Execution, error) {
 	execution, err := s.execRepo.FindByID(ctx, executionID)
 	if err != nil {
@@ -129,9 +129,7 @@ func (s *LambdaService) GetExecution(ctx context.Context, executionID string) (*
 	return execution, nil
 }
 
-
 //Activate service func jo ki orchestrator ke activate service ko call karega
 
 //define funcs to bhe used as interfaces in the orch to activate a service....which will make a particular ENDPOINT for that service
 //defac interface for orch, same logic
-
