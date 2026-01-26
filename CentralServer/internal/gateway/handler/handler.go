@@ -74,14 +74,14 @@ func (h *LambdaHandler) Store(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, resp)
 }
 
-func (h *LambdaHandler) Execute(w http.ResponseWriter, r *http.Request) {
+func (h *LambdaHandler) Trigger(w http.ResponseWriter, r *http.Request) {
 	var req domain.LambdaExecRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
 
-	resp, err := h.service.ExecuteLambda(r.Context(), &req)
+	resp, err := h.service.TriggerLambda(r.Context(), &req)
 	if err != nil {
 		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
 		return
@@ -89,6 +89,23 @@ func (h *LambdaHandler) Execute(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusAccepted, resp)
 }
+
+func (h *LambdaHandler) Activate(w http.ResponseWriter, r *http.Request) {
+	var req domain.LambdaExecRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+
+	resp, err := h.service.ActivateLambda(r.Context(), &req)
+	if err != nil {
+		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, resp)
+}
+
 
 func (h *LambdaHandler) Get(w http.ResponseWriter, r *http.Request) {
 	lambdaID := r.PathValue("id")
