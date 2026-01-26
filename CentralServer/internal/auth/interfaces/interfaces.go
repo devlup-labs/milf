@@ -5,12 +5,14 @@ import (
 	"context"
 )
 
+// UserRepository defines methods for user data persistence.
 // UserRepository defines methods for user data persistence
 type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
 	GetByUsername(ctx context.Context, username string) (*domain.User, error)
 }
 
+// AuthService defines the business logic for authentication.
 // SessionRepository defines methods for session management (optional/extensible)
 type SessionRepository interface {
 	// For now, we might just log creation or validate existence if we were stateful
