@@ -50,7 +50,7 @@ const (
 type Lambda struct {
 	ID         string             `json:"id"`
 	Name       string             `json:"name"`
-	SourceCode string             `json:"source_code"`
+	SourceCode []byte             `json:"source_code"`
 	Runtime    RuntimeEnvironment `json:"runtime"`
 	MemoryMB   int                `json:"memory_mb"`
 	RunType    RunType            `json:"run_type"`

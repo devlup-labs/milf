@@ -20,7 +20,7 @@ type OrchestratorService interface {
 	Execute(ctx context.Context, execution *domain.Execution) (interface{}, error)
 }
 
-// LambdaRepository defines the interface for lambda persistence.
+// DB me code submit karne ka interface
 type LambdaRepository interface {
 	Save(ctx context.Context, lambda *domain.Lambda) error
 	FindByID(ctx context.Context, id string) (*domain.Lambda, error)
@@ -28,7 +28,7 @@ type LambdaRepository interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// ExecutionRepository defines the interface for execution persistence.
+// DB me se execution ke result laane ka interface
 type ExecutionRepository interface {
 	Save(ctx context.Context, execution *domain.Execution) error
 	FindByID(ctx context.Context, id string) (*domain.Execution, error)
