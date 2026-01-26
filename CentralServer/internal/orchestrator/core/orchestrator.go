@@ -39,7 +39,7 @@ func (o *Orchestrator) ActivateService(ctx context.Context, funcID string) (bool
 	   if funcMetaData["status"] != "compiled" {
 		   return false, errors.New("Lambda function is not compiled")
 	   }
-	   _, err = o.Gateway.ActivateJob(funcID, funcMetaData["user_id"])
+	   _, err = o.Gateway.ActivateJob(ctx, funcID, funcMetaData["user_id"])
 	   if err != nil {
 		   return false, err
 	   }
@@ -49,8 +49,8 @@ func (o *Orchestrator) ActivateService(ctx context.Context, funcID string) (bool
 	   return true, nil
 }
 
-func (o *Orchestrator) DeactivateService(funcID string) (bool, error) {
-	   _, err := o.Gateway.DeactivateJob(funcID, "")
+func (o *Orchestrator) DeactivateService(ctx context.Context, funcID string) (bool, error) {
+	   _, err := o.Gateway.DeactivateJob(ctx, funcID, "")
 	   if err != nil {
 		   return false, err
 	   }
@@ -60,6 +60,7 @@ func (o *Orchestrator) DeactivateService(funcID string) (bool, error) {
 	   return true, nil
 }
 
+//input type yet to be decided
 func (o* Orchestrator) ReceiveTrigger(ctx context.Context, trigID string, funcID string, input string) (bool, error) {
 	   jobID := uuid.New().String()
 	   metaData, exists := o.Funcs[funcID]

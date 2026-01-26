@@ -31,7 +31,8 @@ func (r *Router) Setup() http.Handler {
 
 	r.mux.HandleFunc("POST /api/v1/lambdas", wrap(r.handler.Store))
 	r.mux.HandleFunc("GET /api/v1/lambdas/{id}", wrap(r.handler.Get))
-	r.mux.HandleFunc("POST /api/v1/lambdas/execute", wrap(r.handler.Execute))
+	r.mux.HandleFunc("POST /api/v1/lambdas/trigger", wrap(r.handler.Trigger))
+	r.mux.HandleFunc("POST /api/v1/lambdas/activate", wrap(r.handler.Activate))
 	r.mux.HandleFunc("GET /api/v1/executions/{id}", wrap(r.handler.GetExecution))
 
 	r.mux.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {

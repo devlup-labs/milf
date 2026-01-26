@@ -6,5 +6,5 @@ import (
 )
 
 type CompilerService interface {
-	Compile(ctx context.Context, sourceCode string, runtime domain.RuntimeEnvironment) (wasmRef string, err error)
+	Compile(ctx context.Context, sourceCode []byte, runtime domain.RuntimeEnvironment, funcID string, metadata map[string]string) (bool, error)
 }

@@ -1,135 +1,235 @@
 package core
 
 import (
-	"context"
-	"time"
-
 	"central_server/internal/gateway/domain"
 	"central_server/internal/gateway/interfaces"
+	"central_server/utils"
+	"context"
+	"errors"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 )
 
+
 type LambdaService struct {
-	lambdaRepo   interfaces.LambdaRepository
-	execRepo     interfaces.ExecutionRepository
-	compiler     interfaces.CompilerService
+	gatewayDB   interfaces.FuncGatewayDB
+	compilerRepo interfaces.CompilerDB
 	orchestrator interfaces.OrchestratorService
+	compilerQueue *domain.CompilationQueue
 }
+
 
 func NewLambdaService(
-	lambdaRepo interfaces.LambdaRepository,
-	execRepo interfaces.ExecutionRepository,
-	compiler interfaces.CompilerService,
+	gatewayDB interfaces.FuncGatewayDB,
+	compilerRepo interfaces.CompilerDB,
 	orchestrator interfaces.OrchestratorService,
+	compilerQueue *domain.CompilationQueue,
 ) *LambdaService {
 	return &LambdaService{
-		lambdaRepo:   lambdaRepo,
-		execRepo:     execRepo,
-		compiler:     compiler,
-		orchestrator: orchestrator,
+		gatewayDB:     gatewayDB,
+		compilerRepo:  compilerRepo,
+		orchestrator:  orchestrator,
+		compilerQueue: compilerQueue,
 	}
 }
 
-// just for saving lambda in db using db ka interface
+func (s *LambdaService) SetOrchestrator(orch interfaces.OrchestratorService) {
+	s.orchestrator = orch
+}
+
+// StoreLambda implements domain.LambdaService
 func (s *LambdaService) StoreLambda(ctx context.Context, req *domain.LambdaStoreRequest) (*domain.LambdaStoreResponse, error) {
-	if err := domain.ValidateStoreRequest(req); err != nil {
+    // Reusing StoreandQueue logic
+	_, err := s.StoreandQueue(ctx, req)
+	if err != nil {
 		return nil, err
 	}
-
-	wasmRef, err := s.compiler.Compile(ctx, req.SourceCode, req.Runtime)
-	if err != nil {
-		return nil, domain.ErrCompilationFailed
-	}
-
-	now := time.Now().UTC()
-	lambda := &domain.Lambda{
-		ID:         uuid.New().String(),
-		Name:       req.Name,
-		SourceCode: []byte(req.SourceCode),
-		Runtime:    req.Runtime,
-		MemoryMB:   req.MemoryMB,
-		RunType:    req.RunType,
-		WasmRef:    wasmRef,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
-
-	if err := s.lambdaRepo.Save(ctx, lambda); err != nil {
-		return nil, domain.ErrInternalServer
-	}
-
+	// Return dummy response or constructed from req
 	return &domain.LambdaStoreResponse{
-		ID:      lambda.ID,
-		Name:    lambda.Name,
-		WasmRef: lambda.WasmRef,
-		Message: "Lambda stored successfully",
+		ID: req.FuncID,
+		Name: req.FuncID,
+		Message: "Stored and Queued",
 	}, nil
 }
 
-// name this as Send trigger whihc will send a trigger to orchestrator to start the servcie
-func (s *LambdaService) ExecuteLambda(ctx context.Context, req *domain.LambdaExecRequest) (*domain.LambdaExecResponse, error) {
-	if err := domain.ValidateExecRequest(req); err != nil {
+// TriggerLambda implements domain.LambdaService
+func (s *LambdaService) TriggerLambda(ctx context.Context, req *domain.LambdaExecRequest) (*domain.LambdaExecResponse, error) {
+    // Map to SendTrigger?
+    // SendTrigger takes (funcID, input). req has ReferenceID which might be funcID?
+    // ValidateExecRequest checks ReferenceID.
+    ack, err := s.SendTrigger(ctx, req.ReferenceID, fmt.Sprintf("%v", req.Input))
+    if err != nil {
+    	return nil, err
+    }
+    status := domain.ExecutionStatusPending
+    if ack {
+    	status = domain.ExecutionStatusRunning // or pending
+    }
+    return &domain.LambdaExecResponse{
+    	Status: status,
+    	Message: "Trigger sent",
+    }, nil
+}
+
+// ActivateLambda implements domain.LambdaService
+func (s *LambdaService) ActivateLambda(ctx context.Context, req *domain.LambdaExecRequest) (*domain.LambdaExecResponse, error) {
+	if req.ReferenceID == "" {
+		return nil, domain.ErrInvalidRequest
+	}
+	ack, err := s.Activate(ctx, req.ReferenceID)
+	if err != nil {
 		return nil, err
 	}
-
-	lambda, err := s.lambdaRepo.FindByWasmRef(ctx, req.ReferenceID)
-	if err != nil {
-		return nil, domain.ErrLambdaNotFound
+	msg := "Activation requested"
+	if ack {
+		msg = "Activation successful"
 	}
-
-	now := time.Now().UTC()
-	execution := &domain.Execution{
-		ID:          uuid.New().String(),
-		LambdaID:    lambda.ID,
-		ReferenceID: req.ReferenceID,
-		Input:       req.Input,
-		Status:      domain.ExecutionStatusPending,
-		StartedAt:   now,
-	}
-	//DOUBT:dekho isse bc
-	if err := s.execRepo.Save(ctx, execution); err != nil {
-		return nil, domain.ErrInternalServer
-	}
-
-	result, err := s.orchestrator.Execute(ctx, execution) //orch ka trigger wala interface use lena h yha, isse keval yaha pe ack ayega ya error ayega
-	if err != nil {
-		execution.Status = domain.ExecutionStatusFailed
-		execution.Error = err.Error()
-		_ = s.execRepo.Update(ctx, execution)
-		return nil, domain.ErrExecutionFailed
-	}
-
-	execution.Status = domain.ExecutionStatusCompleted
-	execution.Output = result
-	_ = s.execRepo.Update(ctx, execution)
-
 	return &domain.LambdaExecResponse{
-		ExecutionID: execution.ID,
-		Status:      execution.Status,
-		Message:     "Execution completed successfully",
-		Result:      result,
+		Status: domain.ExecutionStatusRunning,
+		Message: msg,
+	}, nil
+}
+
+// DeactivateLambda implements domain.LambdaService
+func (s *LambdaService) DeactivateLambda(ctx context.Context, req *domain.LambdaExecRequest) (*domain.LambdaExecResponse, error) {
+	if req.ReferenceID == "" {
+		return nil, domain.ErrInvalidRequest
+	}
+
+	ack, err := s.DeactivateJob(ctx, req.ReferenceID, "") 
+	if err != nil {
+		return nil, err
+	}
+	msg := "Deactivation requested"
+	if ack {
+		msg = "Deactivation successful"
+	}
+	return &domain.LambdaExecResponse{
+		Status: domain.ExecutionStatusCompleted,
+		Message: msg,
 	}, nil
 }
 
 func (s *LambdaService) GetLambda(ctx context.Context, lambdaID string) (*domain.Lambda, error) {
-	lambda, err := s.lambdaRepo.FindByID(ctx, lambdaID)
-	if err != nil {
-		return nil, domain.ErrLambdaNotFound
-	}
-	return lambda, nil
+	return s.gatewayDB.FindByID(ctx, lambdaID)
 }
 
-// exec ka status ayega yaha pe hamare paas
 func (s *LambdaService) GetExecution(ctx context.Context, executionID string) (*domain.Execution, error) {
-	execution, err := s.execRepo.FindByID(ctx, executionID)
-	if err != nil {
-		return nil, err
-	}
-	return execution, nil
+	// Not implemented yet in DB interface?
+	return nil, errors.New("not implemented")
 }
 
-//Activate service func jo ki orchestrator ke activate service ko call karega
+//func to store the lambda in database of func gateway(one with low TTL) anmd add a job to compilation queue
+func (s* LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaStoreRequest) (bool, error) {
+	utils.Info(fmt.Sprintf("[Gateway] Received StoreAndQueue request for FuncID: %s, UserID: %s", req.FuncID, req.UserID))
 
-//define funcs to bhe used as interfaces in the orch to activate a service....which will make a particular ENDPOINT for that service
-//defac interface for orch, same logic
+	if err := domain.ValidateStoreRequest(req); err != nil {
+		utils.Error(fmt.Sprintf("[Gateway] Validation failed for FuncID: %s. Error: %v", req.FuncID, err))
+		return false, err
+	}
+	
+
+	lambda := &domain.Lambda{
+		ID:         req.FuncID,
+		Name:       req.FuncID,
+		SourceCode: req.SourceCode,
+		Runtime:    req.Runtime,
+		MemoryMB:   req.MemoryMB,
+		RunType:    req.RunType,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+
+	err := s.gatewayDB.Save(ctx, lambda)
+	if err != nil {
+		errMsg := fmt.Sprintf("[Gateway] Error saving lambda to database: %v", err)
+		utils.Error(errMsg)
+		return false, domain.ErrInternalServer
+	}
+	utils.Info(fmt.Sprintf("[Gateway] Lambda %s saved to DB successfully", req.FuncID))
+
+	if(s.compilerQueue.JobsMap[req.FuncID]!=nil){
+		utils.Info(fmt.Sprintf("[Gateway] Job for %s already exists in queue, skipping enqueue", req.FuncID))
+		return true, nil
+	}
+
+	err = s.compilerQueue.AddJob(&domain.CompilationQueueObject{
+		FuncID: req.FuncID,
+	})	    
+	if err != nil {
+		errMsg := fmt.Sprintf("[Gateway] Error adding job to compilation queue: %v", err)
+		utils.Error(errMsg)
+		return false, err
+	}
+	utils.Info(fmt.Sprintf("[Gateway] Job for %s added to CompilationQueue", req.FuncID))
+	return true, nil     
+}
+
+
+func (s* LambdaService) Activate(ctx context.Context, funcID string)(bool, error){
+	if(funcID==""){
+		return false, domain.ErrExecutionFailed
+	}
+	// Check if orchestrator is set
+	if s.orchestrator == nil {
+		return false, errors.New("orchestrator not initialized")
+	}
+	ack, err := s.orchestrator.ActivateService(ctx, funcID)
+	if(err!=nil){
+		errMsg := fmt.Sprintf("Error activating the service: %v", err)
+		utils.Error(errMsg)
+		return false, err
+	}
+	return ack, nil
+}
+
+//func to send a deactivate service req to orchestrator
+func (s* LambdaService) DeactivateJob(ctx context.Context, funcID string, userID string)(bool, error){
+	if(funcID==""){
+		return false, domain.ErrExecutionFailed
+	}
+	ack, err := s.orchestrator.DeactivateService(ctx, funcID)
+	if(err!=nil){
+		errMsg := fmt.Sprintf("Error deactivating the service: %v", err)
+		utils.Error(errMsg)
+		return false, err
+	}
+	return ack, nil
+}
+
+//func to send a trigger for a service to orchestrator
+func (s* LambdaService) SendTrigger(ctx context.Context, funcID string, input string)(bool, error){
+	if(funcID==""){
+		return false, domain.ErrExecutionFailed
+	}
+	trigID := uuid.New().String()
+	ack, err := s.orchestrator.ReceiveTrigger(ctx, trigID, funcID, input)
+	if(err!=nil){
+		errMsg := fmt.Sprintf("Error sending trigger to orchestrator: %v", err)
+		utils.Error(errMsg)
+		return false, err
+	}
+	return ack, nil
+}
+
+func (s* LambdaService) GetStatus(ctx context.Context, funcID string)(string, error){
+    if(funcID==""){
+		return "", domain.ErrExecutionFailed
+	}
+	exist, _ := s.compilerQueue.JobsMap[funcID]
+	if(exist!=nil){
+		return "In Queue", nil
+	}else if status, err := s.compilerRepo.GetStatus(ctx, funcID); err==nil{
+		return status, nil
+	}else{
+		return "still compiling", nil
+	}
+}
+
+func (s* LambdaService) ActivateJob(ctx context.Context, funcID string, userID string)(bool, error){
+
+	// logic for route mapping ot be done 
+	return true, nil
+}

@@ -2,10 +2,10 @@ package interfaces
 
 import (
 	"context"
-
-	"central_server/internal/gateway/domain"
 )
 
 type OrchestratorService interface {
-	Execute(ctx context.Context, execution *domain.Execution) (interface{}, error)
+	ReceiveTrigger(ctx context.Context, trigID string, funcID string, input string) (bool, error)
+	ActivateService(ctx context.Context, funcID string) (bool, error)
+	DeactivateService(ctx context.Context, funcID string) (bool, error)
 }
