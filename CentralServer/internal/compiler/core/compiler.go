@@ -1,23 +1,25 @@
 package core
+
 import (
+	"central_server/internal/compiler/domain"
+	"central_server/internal/compiler/interfaces"
 	"errors"
-	"os"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
- "CentralServer/internal/compiler/domain"
- "CentralServer/internal/compiler/interfaces"
 )
-type Compiler struct{
-objectStore interfaces.ObjectStore
-trigger     interfaces.RunTrigger
+
+type Compiler struct {
+	objectStore interfaces.ObjectStore
+	trigger     interfaces.RunTrigger
 }
 
 func NewCompiler(
 	objectStore interfaces.ObjectStore,
-	trigger interfaces.RunTrigger
-	) *Compiler {
+	trigger interfaces.RunTrigger,
+) *Compiler {
 	return &Compiler{
 		objectStore: objectStore,
 		trigger:     trigger,
@@ -36,25 +38,22 @@ func newCompilationError(
 	}
 }
 
-
 func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
-	
 
 	// ---- FETCH STAGE ----
-    req, err := c.objectStore.FetchCompilationRequest(lambdaID)
-    if err != nil {
-	ce := newCompilationError(lambdaID, "fetch", err)
-	return nil, &ce
-}
+	req, err := c.objectStore.FetchCompilationRequest(lambdaID)
+	if err != nil {
+		ce := newCompilationError(lambdaID, "fetch", err)
+		return nil, &ce
+	}
 
 	// ---- VALIDATE STAGE ----
-		if err := req.Validate(); err != nil {
+	if err := req.Validate(); err != nil {
 		ce := newCompilationError(req.LambdaID, "validate", err)
 		return nil, &ce
 	}
-	
-	var wasmBytes []byte
 
+	var wasmBytes []byte
 
 	// ---- BUILD STAGE ----
 	switch req.Runtime {
@@ -87,28 +86,31 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 		return nil, &ce
 	}
 
+	// ---- STORE METADATA STAGE ----
+	meta := req.Metadata
+	meta.LambdaRef = req.LambdaID
+	meta.UserID = req.UserID
+	meta.TriggerImmediate = req.RunImmediate
 
-    // ---- STORE METADATA STAGE ----
-	err = c.objectStore.StoreMetadata(req.LambdaID, req.Metadata)
+	err = c.objectStore.StoreMetadata(req.LambdaID, meta)
 	if err != nil {
 		ce := newCompilationError(req.LambdaID, "store", err)
 		return nil, &ce
 	}
 
 	// ---- TRIGGER STAGE ----
-    if req.RunImmediate {
-	err := c.trigger.TriggerRun(req.LambdaID)
-	if err != nil {
-		ce := newCompilationError(req.LambdaID, "trigger", err)
-		return nil, &ce
+	if req.RunImmediate {
+		err := c.trigger.TriggerRun(req.LambdaID)
+		if err != nil {
+			ce := newCompilationError(req.LambdaID, "trigger", err)
+			return nil, &ce
+		}
 	}
-}
-
 
 	return wasmBytes, nil
 }
 
-	func (c *Compiler) compileC(req domain.CompilationRequest) ([]byte, error) {
+func (c *Compiler) compileC(req domain.CompilationRequest) ([]byte, error) {
 
 	// 1. Find the C source file
 	var cFile *domain.SourceFile
@@ -175,5 +177,3 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 	// 9. Compilation successful
 	return wasmBytes, nil
 }
-
-

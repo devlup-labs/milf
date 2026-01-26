@@ -4,8 +4,8 @@ type RuntimeType string
 const (
 	RuntimeGo   RuntimeType = "go"
 	RuntimeRust RuntimeType = "rust"
-	RuntimeC RuntimeType = "c"
-	RuntimeCpp RuntimeType = "cpp"
+	RuntimeC    RuntimeType = "c"
+	RuntimeCpp  RuntimeType = "cpp"
 )
 
 type SourceFile struct {
@@ -14,8 +14,11 @@ type SourceFile struct {
 }
 
 type FunctionMetadata struct {
-	Name        string
-	MemoryMB    int
-	TimeoutSec int
-	EntryPoint string
+	Name             string
+	MemoryMB         int
+	TimeoutSec       int
+	EntryPoint       string
+	LambdaRef        string
+	UserID           string
+	TriggerImmediate bool
 }

@@ -1,6 +1,6 @@
 package interfaces
 
-import "CentralServer/internal/compiler/domain"
+import "central_server/internal/compiler/domain"
 
 type ObjectStore interface {
 

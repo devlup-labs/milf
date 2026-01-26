@@ -1,4 +1,5 @@
 package domain
+import "fmt"
 type CompilationRequest struct {
 	LambdaID     string
 	UserID       string
@@ -9,18 +10,13 @@ type CompilationRequest struct {
 }
 
 func (r *CompilationRequest) Validate() error {
-	// later you will check:
-	// - lambdaID not empty
-	// - runtime supported
-	// - source files exist
-		if r.LambdaID == "" {
+	if r.LambdaID == "" {
 		return fmt.Errorf("lambdaID cannot be empty")
 	}
-
 	if len(r.SourceFiles) == 0 {
 		return fmt.Errorf("no source files provided")
 	}
 
 	return nil
-	
+
 }

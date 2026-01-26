@@ -1,5 +1,6 @@
 package domain
-type Compilationerror struct {
+
+type CompilationError struct {
 	LambdaID string
 	Stage    string //fetch, build, link
 	Message  string
