@@ -35,13 +35,15 @@ func decodeJSON(r *http.Request, v interface{}) error {
 
 func mapErrorToHTTPStatus(err error) int {
 	switch err {
-	case domain.ErrLambdaNotFound:
+	case domain.ErrLambdaNotFound, domain.ErrJobNotFound:
 		return http.StatusNotFound
 	case domain.ErrInvalidRuntime, domain.ErrInvalidRunType, domain.ErrInvalidRequest:
 		return http.StatusBadRequest
 	case domain.ErrCompilationFailed:
 		return http.StatusUnprocessableEntity
 	case domain.ErrExecutionFailed:
+		return http.StatusServiceUnavailable
+	case domain.ErrQueueFailed:
 		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
@@ -120,4 +122,20 @@ func (h *LambdaHandler) GetExecution(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, execution)
+}
+
+func (h *LambdaHandler) GetCompilationStatus(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("jobId")
+	if jobID == "" {
+		writeError(w, http.StatusBadRequest, "Compilation job ID is required", "")
+		return
+	}
+
+	status, err := h.service.GetCompilationStatus(r.Context(), jobID)
+	if err != nil {
+		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, status)
 }

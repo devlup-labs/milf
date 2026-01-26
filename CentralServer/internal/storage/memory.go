@@ -135,6 +135,57 @@ func (DummyCompiler) Compile(ctx context.Context, sourceCode string, runtime gwd
 	return uuid.New().String(), nil
 }
 
+// DummyCompilationQueue is a stub compilation queue for testing.
+// It stores jobs in memory and simulates async compilation.
+type DummyCompilationQueue struct {
+	mu   sync.RWMutex
+	jobs map[string]*gwdomain.CompilationJobStatus
+}
+
+func NewDummyCompilationQueue() *DummyCompilationQueue {
+	return &DummyCompilationQueue{
+		jobs: make(map[string]*gwdomain.CompilationJobStatus),
+	}
+}
+
+func (q *DummyCompilationQueue) Enqueue(ctx context.Context, job *gwdomain.CompilationJob) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	// Create a job status entry
+	status := &gwdomain.CompilationJobStatus{
+		JobID:    job.ID,
+		LambdaID: job.LambdaID,
+		Status:   gwdomain.CompilationStatusQueued,
+		QueuedAt: job.CreatedAt,
+	}
+	q.jobs[job.ID] = status
+
+	// In a real implementation, this would be processed by a worker.
+	// For the dummy, we immediately mark it as completed with a generated wasm ref.
+	go func() {
+		q.mu.Lock()
+		defer q.mu.Unlock()
+		if s, ok := q.jobs[job.ID]; ok {
+			s.Status = gwdomain.CompilationStatusCompleted
+			s.WasmRef = uuid.New().String()
+		}
+	}()
+
+	return nil
+}
+
+func (q *DummyCompilationQueue) GetJobStatus(ctx context.Context, jobID string) (*gwdomain.CompilationJobStatus, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	status, ok := q.jobs[jobID]
+	if !ok {
+		return nil, gwdomain.ErrJobNotFound
+	}
+	return status, nil
+}
+
 // DummyOrchestrator is a stub orchestrator for testing.
 type DummyOrchestrator struct{}
 

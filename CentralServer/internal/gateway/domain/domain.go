@@ -16,6 +16,8 @@ var (
 	ErrExecutionFailed   = errors.New("execution failed")
 	ErrInvalidRequest    = errors.New("invalid request")
 	ErrInternalServer    = errors.New("internal server error")
+	ErrQueueFailed       = errors.New("failed to enqueue compilation job")
+	ErrJobNotFound       = errors.New("compilation job not found")
 )
 
 // --- Enums ---
@@ -45,6 +47,16 @@ const (
 	ExecutionStatusFailed    ExecutionStatus = "failed"
 )
 
+// CompilationStatus represents the status of a compilation job in the queue.
+type CompilationStatus string
+
+const (
+	CompilationStatusQueued     CompilationStatus = "queued"
+	CompilationStatusProcessing CompilationStatus = "processing"
+	CompilationStatusCompleted  CompilationStatus = "completed"
+	CompilationStatusFailed     CompilationStatus = "failed"
+)
+
 // --- Entities ---
 
 type Lambda struct {
@@ -71,6 +83,28 @@ type Execution struct {
 	FinishedAt  *time.Time             `json:"finished_at,omitempty"`
 }
 
+// CompilationJob represents a job to compile a lambda function.
+type CompilationJob struct {
+	ID         string             `json:"id"`
+	LambdaID   string             `json:"lambda_id"`
+	SourceCode string             `json:"source_code"`
+	Runtime    RuntimeEnvironment `json:"runtime"`
+	Priority   int                `json:"priority"`
+	CreatedAt  time.Time          `json:"created_at"`
+}
+
+// CompilationJobStatus represents the current status of a compilation job.
+type CompilationJobStatus struct {
+	JobID       string            `json:"job_id"`
+	LambdaID    string            `json:"lambda_id"`
+	Status      CompilationStatus `json:"status"`
+	WasmRef     string            `json:"wasm_ref,omitempty"`
+	Error       string            `json:"error,omitempty"`
+	QueuedAt    time.Time         `json:"queued_at"`
+	StartedAt   *time.Time        `json:"started_at,omitempty"`
+	CompletedAt *time.Time        `json:"completed_at,omitempty"`
+}
+
 // --- DTOs ---
 
 type LambdaStoreRequest struct {
@@ -82,10 +116,11 @@ type LambdaStoreRequest struct {
 }
 
 type LambdaStoreResponse struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	WasmRef string `json:"wasm_ref"`
-	Message string `json:"message"`
+	ID                string            `json:"id"`
+	Name              string            `json:"name"`
+	CompilationJobID  string            `json:"compilation_job_id"`
+	CompilationStatus CompilationStatus `json:"compilation_status"`
+	Message           string            `json:"message"`
 }
 
 type LambdaExecRequest struct {
@@ -98,6 +133,23 @@ type LambdaExecResponse struct {
 	Status      ExecutionStatus `json:"status"`
 	Message     string          `json:"message"`
 	Result      interface{}     `json:"result,omitempty"`
+}
+
+// CompilationStatusRequest is used to check the status of a compilation job.
+type CompilationStatusRequest struct {
+	JobID string `json:"job_id"`
+}
+
+// CompilationStatusResponse is the response for a compilation status check.
+type CompilationStatusResponse struct {
+	JobID       string            `json:"job_id"`
+	LambdaID    string            `json:"lambda_id"`
+	Status      CompilationStatus `json:"status"`
+	WasmRef     string            `json:"wasm_ref,omitempty"`
+	Error       string            `json:"error,omitempty"`
+	QueuedAt    time.Time         `json:"queued_at"`
+	StartedAt   *time.Time        `json:"started_at,omitempty"`
+	CompletedAt *time.Time        `json:"completed_at,omitempty"`
 }
 
 type ErrorResponse struct {
@@ -166,4 +218,5 @@ type LambdaService interface {
 	ExecuteLambda(ctx context.Context, req *LambdaExecRequest) (*LambdaExecResponse, error)
 	GetLambda(ctx context.Context, lambdaID string) (*Lambda, error)
 	GetExecution(ctx context.Context, executionID string) (*Execution, error)
+	GetCompilationStatus(ctx context.Context, jobID string) (*CompilationStatusResponse, error)
 }

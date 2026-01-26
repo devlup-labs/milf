@@ -24,10 +24,10 @@ func main() {
 	// Gateway
 	lambdaRepo := storage.NewMemoryLambdaRepo()
 	execRepo := storage.NewMemoryExecutionRepo()
-	compiler := storage.DummyCompiler{}
+	compilationQueue := storage.NewDummyCompilationQueue()
 	orchestrator := storage.DummyOrchestrator{}
 
-	lambdaService := gwcore.NewLambdaService(lambdaRepo, execRepo, compiler, orchestrator)
+	lambdaService := gwcore.NewLambdaService(lambdaRepo, execRepo, compilationQueue, orchestrator)
 	lambdaHandler := gwhandler.NewLambdaHandler(lambdaService)
 	gatewayRouter := gwinterfaces.NewRouter(lambdaHandler, authHandler.AuthMiddleware)
 
@@ -51,6 +51,7 @@ func main() {
 	mux.Handle("/api/v1/lambdas", gatewayMux)
 	mux.Handle("/api/v1/lambdas/", gatewayMux)
 	mux.Handle("/api/v1/executions/", gatewayMux)
+	mux.Handle("/api/v1/compilations/", gatewayMux)
 	mux.Handle("/health", gatewayMux)
 
 	// Mount sink manager routes

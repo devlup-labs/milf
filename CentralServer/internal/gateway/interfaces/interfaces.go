@@ -10,7 +10,15 @@ import (
 
 // --- External Service Interfaces (Ports) ---
 
-// CompilerService defines the interface for the compiler module.
+// CompilationQueueService defines the interface for enqueueing compilation jobs.
+type CompilationQueueService interface {
+	// Enqueue adds a compilation job to the queue and returns a job ID.
+	Enqueue(ctx context.Context, job *domain.CompilationJob) error
+	// GetJobStatus retrieves the current status of a compilation job.
+	GetJobStatus(ctx context.Context, jobID string) (*domain.CompilationJobStatus, error)
+}
+
+// CompilerService defines the interface for the compiler module (synchronous compilation).
 type CompilerService interface {
 	Compile(ctx context.Context, sourceCode string, runtime domain.RuntimeEnvironment) (wasmRef string, err error)
 }
@@ -65,6 +73,7 @@ func (r *Router) Setup() http.Handler {
 	r.mux.HandleFunc("GET /api/v1/lambdas/{id}", wrap(r.handler.Get))
 	r.mux.HandleFunc("POST /api/v1/lambdas/execute", wrap(r.handler.Execute))
 	r.mux.HandleFunc("GET /api/v1/executions/{id}", wrap(r.handler.GetExecution))
+	r.mux.HandleFunc("GET /api/v1/compilations/{jobId}", wrap(r.handler.GetCompilationStatus))
 
 	r.mux.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

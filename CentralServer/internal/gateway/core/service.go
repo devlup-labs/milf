@@ -11,23 +11,23 @@ import (
 )
 
 type LambdaService struct {
-	lambdaRepo   interfaces.LambdaRepository
-	execRepo     interfaces.ExecutionRepository
-	compiler     interfaces.CompilerService
-	orchestrator interfaces.OrchestratorService
+	lambdaRepo       interfaces.LambdaRepository
+	execRepo         interfaces.ExecutionRepository
+	compilationQueue interfaces.CompilationQueueService
+	orchestrator     interfaces.OrchestratorService
 }
 
 func NewLambdaService(
 	lambdaRepo interfaces.LambdaRepository,
 	execRepo interfaces.ExecutionRepository,
-	compiler interfaces.CompilerService,
+	compilationQueue interfaces.CompilationQueueService,
 	orchestrator interfaces.OrchestratorService,
 ) *LambdaService {
 	return &LambdaService{
-		lambdaRepo:   lambdaRepo,
-		execRepo:     execRepo,
-		compiler:     compiler,
-		orchestrator: orchestrator,
+		lambdaRepo:       lambdaRepo,
+		execRepo:         execRepo,
+		compilationQueue: compilationQueue,
+		orchestrator:     orchestrator,
 	}
 }
 
@@ -36,20 +36,19 @@ func (s *LambdaService) StoreLambda(ctx context.Context, req *domain.LambdaStore
 		return nil, err
 	}
 
-	wasmRef, err := s.compiler.Compile(ctx, req.SourceCode, req.Runtime)
-	if err != nil {
-		return nil, domain.ErrCompilationFailed
-	}
-
 	now := time.Now().UTC()
+	lambdaID := uuid.New().String()
+	jobID := uuid.New().String()
+
+	// Create the lambda record with pending compilation status
 	lambda := &domain.Lambda{
-		ID:         uuid.New().String(),
+		ID:         lambdaID,
 		Name:       req.Name,
 		SourceCode: req.SourceCode,
 		Runtime:    req.Runtime,
 		MemoryMB:   req.MemoryMB,
 		RunType:    req.RunType,
-		WasmRef:    wasmRef,
+		WasmRef:    "", // Will be populated after compilation completes
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -58,11 +57,28 @@ func (s *LambdaService) StoreLambda(ctx context.Context, req *domain.LambdaStore
 		return nil, domain.ErrInternalServer
 	}
 
+	// Create and enqueue the compilation job
+	compilationJob := &domain.CompilationJob{
+		ID:         jobID,
+		LambdaID:   lambdaID,
+		SourceCode: req.SourceCode,
+		Runtime:    req.Runtime,
+		Priority:   0, // Default priority
+		CreatedAt:  now,
+	}
+
+	if err := s.compilationQueue.Enqueue(ctx, compilationJob); err != nil {
+		// Rollback: delete the lambda if we can't enqueue the job
+		_ = s.lambdaRepo.Delete(ctx, lambdaID)
+		return nil, domain.ErrQueueFailed
+	}
+
 	return &domain.LambdaStoreResponse{
-		ID:      lambda.ID,
-		Name:    lambda.Name,
-		WasmRef: lambda.WasmRef,
-		Message: "Lambda stored successfully",
+		ID:                lambdaID,
+		Name:              lambda.Name,
+		CompilationJobID:  jobID,
+		CompilationStatus: domain.CompilationStatusQueued,
+		Message:           "Lambda stored successfully. Compilation job has been queued.",
 	}, nil
 }
 
@@ -124,4 +140,26 @@ func (s *LambdaService) GetExecution(ctx context.Context, executionID string) (*
 		return nil, err
 	}
 	return execution, nil
+}
+
+func (s *LambdaService) GetCompilationStatus(ctx context.Context, jobID string) (*domain.CompilationStatusResponse, error) {
+	if jobID == "" {
+		return nil, domain.ErrInvalidRequest
+	}
+
+	status, err := s.compilationQueue.GetJobStatus(ctx, jobID)
+	if err != nil {
+		return nil, domain.ErrJobNotFound
+	}
+
+	return &domain.CompilationStatusResponse{
+		JobID:       status.JobID,
+		LambdaID:    status.LambdaID,
+		Status:      status.Status,
+		WasmRef:     status.WasmRef,
+		Error:       status.Error,
+		QueuedAt:    status.QueuedAt,
+		StartedAt:   status.StartedAt,
+		CompletedAt: status.CompletedAt,
+	}, nil
 }
