@@ -74,7 +74,6 @@ func (q *Queue) PopJob() (*Job, error) {
 	return job, nil
 }
 
-//helper to remove any arbitrary job from the queue(maybe needed for cancellation)
 func (q *Queue) RemoveJob(jobID string) error {
 	elem, exists := q.existMap[jobID]
 	if !exists {

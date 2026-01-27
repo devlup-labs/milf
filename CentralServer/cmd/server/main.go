@@ -9,6 +9,7 @@ import (
 	gwcore "central_server/internal/gateway/core"
 	gwhandler "central_server/internal/gateway/handler"
 	gwinterfaces "central_server/internal/gateway/interfaces"
+	qscore "central_server/internal/queueService/core"
 	sinkcore "central_server/internal/sinkManager/core"
 	sinkhandler "central_server/internal/sinkManager/handler"
 	sinkinterfaces "central_server/internal/sinkManager/interfaces"
@@ -37,7 +38,10 @@ func main() {
 	resultRepo := storage.NewMemoryTaskResultRepo()
 	sinkClient := storage.DummySinkClient{}
 
-	sinkService := sinkcore.NewSinkManagerService(sinkRepo, taskRepo, resultRepo, sinkClient, nil, "dev-secret")
+	// QueueService - directly wired to sinkManager
+	queueService := qscore.NewQueueService()
+
+	sinkService := sinkcore.NewSinkManagerService(sinkRepo, taskRepo, resultRepo, sinkClient, queueService, nil, "dev-secret")
 	sinkHandler := sinkhandler.NewSinkHandler(sinkService)
 	sinkRouter := sinkinterfaces.NewRouter(sinkHandler, authHandler.AuthMiddleware)
 

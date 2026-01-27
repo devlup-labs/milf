@@ -1,5 +1,4 @@
 package core
-
 import (
 	"central_server/internal/queueService/domain"
 	"central_server/utils"

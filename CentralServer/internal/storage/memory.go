@@ -224,14 +224,12 @@ func (r *MemorySinkRepo) Delete(ctx context.Context, id string) error {
 // MemoryTaskRepo is an in-memory implementation of TaskRepository.
 type MemoryTaskRepo struct {
 	mu            sync.RWMutex
-	byID          map[string]*sinkdomain.Task
 	byExecutionID map[string]*sinkdomain.Task
 	bySinkID      map[string][]*sinkdomain.Task
 }
 
 func NewMemoryTaskRepo() *MemoryTaskRepo {
 	return &MemoryTaskRepo{
-		byID:          make(map[string]*sinkdomain.Task),
 		byExecutionID: make(map[string]*sinkdomain.Task),
 		bySinkID:      make(map[string][]*sinkdomain.Task),
 	}
@@ -240,20 +238,9 @@ func NewMemoryTaskRepo() *MemoryTaskRepo {
 func (r *MemoryTaskRepo) Save(ctx context.Context, task *sinkdomain.Task) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.byID[task.ID] = task
 	r.byExecutionID[task.ExecutionID] = task
 	r.bySinkID[task.SinkID] = append(r.bySinkID[task.SinkID], task)
 	return nil
-}
-
-func (r *MemoryTaskRepo) FindByID(ctx context.Context, id string) (*sinkdomain.Task, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	task, ok := r.byID[id]
-	if !ok {
-		return nil, errors.New("task not found")
-	}
-	return task, nil
 }
 
 func (r *MemoryTaskRepo) FindByExecutionID(ctx context.Context, executionID string) (*sinkdomain.Task, error) {
@@ -279,31 +266,28 @@ func (r *MemoryTaskRepo) FindBySinkID(ctx context.Context, sinkID string) ([]*si
 func (r *MemoryTaskRepo) Update(ctx context.Context, task *sinkdomain.Task) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.byID[task.ID]; !ok {
+	if _, ok := r.byExecutionID[task.ExecutionID]; !ok {
 		return errors.New("task not found")
 	}
-	r.byID[task.ID] = task
 	r.byExecutionID[task.ExecutionID] = task
 	return nil
 }
 
-func (r *MemoryTaskRepo) Delete(ctx context.Context, id string) error {
+func (r *MemoryTaskRepo) Delete(ctx context.Context, executionID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.byID, id)
+	delete(r.byExecutionID, executionID)
 	return nil
 }
 
 // MemoryTaskResultRepo is an in-memory implementation of TaskResultRepository.
 type MemoryTaskResultRepo struct {
 	mu            sync.RWMutex
-	byTaskID      map[string]*sinkdomain.TaskResult
 	byExecutionID map[string]*sinkdomain.TaskResult
 }
 
 func NewMemoryTaskResultRepo() *MemoryTaskResultRepo {
 	return &MemoryTaskResultRepo{
-		byTaskID:      make(map[string]*sinkdomain.TaskResult),
 		byExecutionID: make(map[string]*sinkdomain.TaskResult),
 	}
 }
@@ -311,19 +295,8 @@ func NewMemoryTaskResultRepo() *MemoryTaskResultRepo {
 func (r *MemoryTaskResultRepo) Save(ctx context.Context, result *sinkdomain.TaskResult) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.byTaskID[result.TaskID] = result
 	r.byExecutionID[result.ExecutionID] = result
 	return nil
-}
-
-func (r *MemoryTaskResultRepo) FindByTaskID(ctx context.Context, taskID string) (*sinkdomain.TaskResult, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	result, ok := r.byTaskID[taskID]
-	if !ok {
-		return nil, sinkdomain.ErrResultNotFound
-	}
-	return result, nil
 }
 
 func (r *MemoryTaskResultRepo) FindByExecutionID(ctx context.Context, executionID string) (*sinkdomain.TaskResult, error) {
@@ -339,18 +312,10 @@ func (r *MemoryTaskResultRepo) FindByExecutionID(ctx context.Context, executionI
 // DummySinkClient is a stub sink client for testing.
 type DummySinkClient struct{}
 
-func (DummySinkClient) SendHeartbeat(ctx context.Context, sink *sinkdomain.Sink) (*sinkdomain.HeartbeatRequest, error) {
-	return &sinkdomain.HeartbeatRequest{
-		SinkID:             sink.ID,
-		RAMAvailableMB:     sink.RAMAvailableMB,
-		StorageAvailableMB: sink.StorageAvailableMB,
-	}, nil
-}
-
 func (DummySinkClient) DeliverTask(ctx context.Context, sink *sinkdomain.Sink, task *sinkdomain.TaskDeliveryRequest) (*sinkdomain.TaskDeliveryResponse, error) {
 	return &sinkdomain.TaskDeliveryResponse{
-		TaskID:   task.TaskID,
-		Accepted: true,
-		Message:  "Task accepted for execution",
+		ExecutionID: task.ExecutionID,
+		Accepted:    true,
+		Message:     "Task accepted for execution",
 	}, nil
 }

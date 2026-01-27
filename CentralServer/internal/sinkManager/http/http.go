@@ -11,7 +11,6 @@ import (
 	"central_server/internal/sinkManager/domain"
 )
 
-// HTTPSinkClient implements SinkClient interface for HTTP communication
 type HTTPSinkClient struct {
 	httpClient *http.Client
 }
@@ -24,7 +23,6 @@ func NewHTTPSinkClient(timeout time.Duration) *HTTPSinkClient {
 	}
 }
 
-// SendHeartbeat sends a heartbeat request to the sink and returns the response
 func (c *HTTPSinkClient) SendHeartbeat(ctx context.Context, sink *domain.Sink) (*domain.HeartbeatRequest, error) {
 	url := fmt.Sprintf("%s/heartbeat", sink.Endpoint)
 
@@ -53,7 +51,6 @@ func (c *HTTPSinkClient) SendHeartbeat(ctx context.Context, sink *domain.Sink) (
 	return &heartbeatResp, nil
 }
 
-// DeliverTask sends a task to the sink for execution
 func (c *HTTPSinkClient) DeliverTask(ctx context.Context, sink *domain.Sink, task *domain.TaskDeliveryRequest) (*domain.TaskDeliveryResponse, error) {
 	url := fmt.Sprintf("%s/execute", sink.Endpoint)
 
