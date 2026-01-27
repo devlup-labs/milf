@@ -1,6 +1,8 @@
 package interfaces
 
+import "context"
+
 type FuncGateway interface {
-	ActivateJob(funcID string, userID string) (bool, error)
-	DeactivateJob(funcID string, userID string) (bool, error)      
+	ActivateJob(ctx context.Context, funcID string, userID string) (bool, error)
+	DeactivateJob(ctx context.Context, funcID string, userID string) (bool, error)      
 }

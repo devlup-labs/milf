@@ -1,14 +1,19 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	authcore "central_server/internal/auth/core"
 	authhandler "central_server/internal/auth/handler"
+	compilercore "central_server/internal/compiler/core"
 	gwcore "central_server/internal/gateway/core"
-	gwhandler "central_server/internal/gateway/handler"
+	"central_server/internal/gateway/domain"
+	gwhandler "central_server/internal/gateway/handler" // gwinterfaces alias in original, reusing
 	gwinterfaces "central_server/internal/gateway/interfaces"
+	orchcore "central_server/internal/orchestrator/core"
+	navqueue "central_server/internal/queueService/core"
 	qscore "central_server/internal/queueService/core"
 	sinkcore "central_server/internal/sinkManager/core"
 	sinkhandler "central_server/internal/sinkManager/handler"
@@ -17,22 +22,46 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
+
 	// Auth
 	userRepo := storage.NewMemoryUserRepo()
 	authService := authcore.NewAuthService(userRepo, "dev-secret")
 	authHandler := authhandler.NewAuthHandler(authService)
 
-	// Gateway
-	lambdaRepo := storage.NewMemoryLambdaRepo()
-	execRepo := storage.NewMemoryExecutionRepo()
-	compiler := storage.DummyCompiler{}
-	orchestrator := storage.DummyOrchestrator{}
+	// --- FUNCTION / COMPILER / ORCHESTRATOR WIRING ---
 
-	lambdaService := gwcore.NewLambdaService(lambdaRepo, execRepo, compiler, orchestrator)
+	// 1. Storage
+	lambdaRepo := storage.NewMemoryLambdaRepo()
+	gatewayDB := lambdaRepo 
+	compilerRepo := lambdaRepo 
+
+	// ObjectStore for Compiler
+	objectStore := storage.NewMemoryObjectStore()
+	
+	// Trigger for Compiler
+	trigger := &storage.DummyRunTrigger{} 
+
+	// 2. Queues
+	compQueue := domain.NewCompilationQueue()
+
+	queueServiceRaw := navqueue.NewQueueService()
+
+	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue)
+	orchestrator := orchcore.NewOrchestrator(lambdaRepo, lambdaService, queueServiceRaw)
+	compiler := compilercore.NewCompiler(objectStore, trigger, compQueue, orchestrator)
+	go compiler.Start(ctx)
+
+	// 4. Wire Circular Dependencies
+	lambdaService.SetOrchestrator(orchestrator)
+	// lambdaService.SetCompiler(compiler) // Removed as not used by Gateway directly
+
+
+	// 5. Handlers & Routers
 	lambdaHandler := gwhandler.NewLambdaHandler(lambdaService)
 	gatewayRouter := gwinterfaces.NewRouter(lambdaHandler, authHandler.AuthMiddleware)
 
-	// SinkManager
+	// --- SINK MANAGER ---
 	sinkRepo := storage.NewMemorySinkRepo()
 	taskRepo := storage.NewMemoryTaskRepo()
 	resultRepo := storage.NewMemoryTaskResultRepo()
@@ -45,10 +74,10 @@ func main() {
 	sinkHandler := sinkhandler.NewSinkHandler(sinkService)
 	sinkRouter := sinkinterfaces.NewRouter(sinkHandler, authHandler.AuthMiddleware)
 
-	// Routes
+	// --- HTTP SERVER ---
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
-	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
+	mux.HandleFunc("/api/v1/auth/register", authHandler.Register)
+	mux.HandleFunc("/api/v1/auth/login", authHandler.Login)
 
 	// Mount gateway routes
 	gatewayMux := gatewayRouter.Setup()
