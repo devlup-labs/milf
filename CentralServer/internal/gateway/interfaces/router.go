@@ -8,13 +8,15 @@ import (
 type Router struct {
 	mux            *http.ServeMux
 	handler        *handler.LambdaHandler
+	compatHandler  *handler.CompatHandler
 	authMiddleware func(http.Handler) http.Handler
 }
 
-func NewRouter(h *handler.LambdaHandler, authMiddleware func(http.Handler) http.Handler) *Router {
+func NewRouter(h *handler.LambdaHandler,ch *handler.CompatHandler, authMiddleware func(http.Handler) http.Handler) *Router {
 	return &Router{
 		mux:            http.NewServeMux(),
 		handler:        h,
+		compatHandler:  ch,
 		authMiddleware: authMiddleware,
 	}
 }
@@ -42,3 +44,23 @@ func (r *Router) Setup() http.Handler {
 	})
 	return r.mux
 }
+
+r.mux.HandleFunc(
+	"POST /functions/invoke",
+	wrap(r.compatHandler.Invoke),
+)
+
+r.mux.HandleFunc(
+	"POST /functions/create",
+	wrap(r.compatHandler.Create),
+)
+
+r.mux.HandleFunc(
+	"GET /functions/{id}",
+	wrap(r.compatHandler.Get),
+)
+
+r.mux.HandleFunc(
+	"GET /invocations",
+	wrap(r.compatHandler.ListInvocations),
+)
