@@ -29,8 +29,8 @@ const (
 	RuntimeRust       RuntimeEnvironment = "rust"
 	RuntimePython     RuntimeEnvironment = "python"
 	RuntimeJavaScript RuntimeEnvironment = "javascript"
-	RuntimeCpp 	  	  RuntimeEnvironment = "cpp"
-	RuntimeC 	      RuntimeEnvironment = "c"
+	RuntimeCpp        RuntimeEnvironment = "cpp"
+	RuntimeC          RuntimeEnvironment = "c"
 )
 
 type RunType string
@@ -76,7 +76,7 @@ type Execution struct {
 }
 
 type CompilationQueueObject struct {
-	FuncID     string
+	FuncID string
 }
 
 type CompilationQueue struct {
@@ -95,7 +95,7 @@ func (c *CompilationQueue) AddJob(job *CompilationQueueObject) error {
 	}
 	e := c.Jobs.PushBack(*job)
 	c.JobsMap[job.FuncID] = e
-	
+
 	// Signal waiting consumers
 	c.cond.Signal()
 	return nil
@@ -125,6 +125,7 @@ func NewCompilationQueue() *CompilationQueue {
 	q.cond = sync.NewCond(&q.mu)
 	return q
 }
+
 // --- DTOs ---
 
 type LambdaStoreRequest struct {
@@ -134,7 +135,7 @@ type LambdaStoreRequest struct {
 	Runtime    RuntimeEnvironment `json:"runtime"`
 	MemoryMB   int                `json:"memory_mb"`
 	RunType    RunType            `json:"run_type"`
-	MetaData  map[string]string  `json:"metadata,omitempty"`
+	MetaData   map[string]string  `json:"metadata,omitempty"`
 }
 
 type LambdaStoreResponse struct {
@@ -148,7 +149,6 @@ type LambdaExecRequest struct {
 	ReferenceID string                 `json:"reference_id"`
 	Input       map[string]interface{} `json:"input"`
 }
-
 
 type LambdaExecResponse struct {
 	ExecutionID string          `json:"execution_id"`
@@ -225,4 +225,6 @@ type LambdaService interface {
 	DeactivateLambda(ctx context.Context, req *LambdaExecRequest) (*LambdaExecResponse, error)
 	GetLambda(ctx context.Context, lambdaID string) (*Lambda, error)
 	GetExecution(ctx context.Context, executionID string) (*Execution, error)
+	ActivateJob(ctx context.Context, funcID string, userID string) (bool, error)
+	ExecuteJob(ctx context.Context, funcID string, input string) (bool, error)
 }

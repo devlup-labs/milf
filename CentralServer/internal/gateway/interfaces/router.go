@@ -12,7 +12,7 @@ type Router struct {
 	authMiddleware func(http.Handler) http.Handler
 }
 
-func NewRouter(h *handler.LambdaHandler,ch *handler.CompatHandler, authMiddleware func(http.Handler) http.Handler) *Router {
+func NewRouter(h *handler.LambdaHandler, ch *handler.CompatHandler, authMiddleware func(http.Handler) http.Handler) *Router {
 	return &Router{
 		mux:            http.NewServeMux(),
 		handler:        h,
@@ -35,6 +35,7 @@ func (r *Router) Setup() http.Handler {
 	r.mux.HandleFunc("GET /api/v1/lambdas/{id}", wrap(r.handler.Get))
 	r.mux.HandleFunc("POST /api/v1/lambdas/trigger", wrap(r.handler.Trigger))
 	r.mux.HandleFunc("POST /api/v1/lambdas/activate", wrap(r.handler.Activate))
+	r.mux.HandleFunc("POST /api/v1/execute/{id}", wrap(r.handler.Execute))
 	r.mux.HandleFunc("GET /api/v1/executions/{id}", wrap(r.handler.GetExecution))
 
 	r.mux.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
@@ -42,25 +43,25 @@ func (r *Router) Setup() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"healthy"}`))
 	})
+	r.mux.HandleFunc(
+		"POST /functions/invoke",
+		wrap(r.compatHandler.Invoke),
+	)
+
+	r.mux.HandleFunc(
+		"POST /functions/create",
+		wrap(r.compatHandler.Create),
+	)
+
+	r.mux.HandleFunc(
+		"GET /functions/{id}",
+		wrap(r.compatHandler.Get),
+	)
+
+	r.mux.HandleFunc(
+		"GET /invocations",
+		wrap(r.compatHandler.ListInvocations),
+	)
+
 	return r.mux
 }
-
-r.mux.HandleFunc(
-	"POST /functions/invoke",
-	wrap(r.compatHandler.Invoke),
-)
-
-r.mux.HandleFunc(
-	"POST /functions/create",
-	wrap(r.compatHandler.Create),
-)
-
-r.mux.HandleFunc(
-	"GET /functions/{id}",
-	wrap(r.compatHandler.Get),
-)
-
-r.mux.HandleFunc(
-	"GET /invocations",
-	wrap(r.compatHandler.ListInvocations),
-)

@@ -21,10 +21,11 @@ type SinkManagerService struct {
 	resultCallback domain.ResultCallback
 	jwtSecret      []byte
 
-	staleCtx    context.Context
-	staleCancel context.CancelFunc
-	staleWg     sync.WaitGroup
-	mu          sync.Mutex
+	staleCtx      context.Context
+	staleCancel   context.CancelFunc
+	staleWg       sync.WaitGroup
+	mu            sync.Mutex
+	activeLambdas map[string]string
 }
 
 func NewSinkManagerService(
@@ -44,6 +45,7 @@ func NewSinkManagerService(
 		queueService:   queueService,
 		resultCallback: resultCallback,
 		jwtSecret:      []byte(jwtSecret),
+		activeLambdas:  make(map[string]string),
 	}
 }
 
@@ -225,6 +227,10 @@ func (s *SinkManagerService) DeliverTask(ctx context.Context, task *domain.Task)
 
 		sink.Status = domain.SinkStatusBusy
 		_ = s.sinkRepo.Update(ctx, sink)
+
+		s.mu.Lock()
+		s.activeLambdas[task.LambdaID] = sink.ID
+		s.mu.Unlock()
 	} else {
 		task.Status = domain.TaskStatusFailed
 		_ = s.taskRepo.Update(ctx, task)
@@ -390,4 +396,11 @@ func (s *SinkManagerService) markStaleSinksOffline(staleThreshold time.Duration)
 			_ = s.sinkRepo.Update(ctx, sink)
 		}
 	}
+}
+
+func (s *SinkManagerService) GetSinkForLambda(ctx context.Context, lambdaID string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sinkID, ok := s.activeLambdas[lambdaID]
+	return sinkID, ok
 }

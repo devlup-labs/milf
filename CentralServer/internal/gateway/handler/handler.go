@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"central_server/internal/gateway/domain"
@@ -106,7 +107,6 @@ func (h *LambdaHandler) Activate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, resp)
 }
 
-
 func (h *LambdaHandler) Get(w http.ResponseWriter, r *http.Request) {
 	lambdaID := r.PathValue("id")
 	if lambdaID == "" {
@@ -137,4 +137,30 @@ func (h *LambdaHandler) GetExecution(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, execution)
+}
+
+func (h *LambdaHandler) Execute(w http.ResponseWriter, r *http.Request) {
+	lambdaID := r.PathValue("id")
+	if lambdaID == "" {
+		writeError(w, http.StatusBadRequest, "Lambda ID is required", "")
+		return
+	}
+
+	var input map[string]interface{}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+
+	// Assuming ActivateJob can be reused or we create ExecuteJob
+	ack, err := h.service.ExecuteJob(r.Context(), lambdaID, fmt.Sprintf("%v", input))
+	if err != nil {
+		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, map[string]interface{}{
+		"status":       "Execution requested",
+		"acknowledged": ack,
+	})
 }

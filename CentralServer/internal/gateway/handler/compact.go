@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"central_server/internal/gateway/domain"
 )
@@ -54,11 +55,11 @@ func (h *CompatHandler) Invoke(w http.ResponseWriter, r *http.Request) {
 func (h *CompatHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// What the client sends (simplified mockApi shape)
 	var req struct {
-		Name       string                 `json:"name"`
-		Runtime    string                 `json:"runtime"`
-		Memory     int                    `json:"memory"`
-		SourceCode []byte                 `json:"sourceCode"`
-		MetaData   map[string]string      `json:"metadata,omitempty"`
+		Name       string            `json:"name"`
+		Runtime    string            `json:"runtime"`
+		Memory     int               `json:"memory"`
+		SourceCode []byte            `json:"sourceCode"`
+		MetaData   map[string]string `json:"metadata,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -110,14 +111,14 @@ func (h *CompatHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// Return in client-friendly shape
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":         lambda.ID,
-		"name":       lambda.Name,
-		"runtime":    lambda.Runtime,
-		"memory":     lambda.MemoryMB,
-		"createdAt":  lambda.CreatedAt,
-		"updatedAt":  lambda.UpdatedAt,
-		"wasmRef":    lambda.WasmRef,
-		"runType":    lambda.RunType,
+		"id":        lambda.ID,
+		"name":      lambda.Name,
+		"runtime":   lambda.Runtime,
+		"memory":    lambda.MemoryMB,
+		"createdAt": lambda.CreatedAt,
+		"updatedAt": lambda.UpdatedAt,
+		"wasmRef":   lambda.WasmRef,
+		"runType":   lambda.RunType,
 	})
 }
 
@@ -149,4 +150,3 @@ func (h *CompatHandler) ListInvocations(w http.ResponseWriter, r *http.Request) 
 		},
 	})
 }
-
