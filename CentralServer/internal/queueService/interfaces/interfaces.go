@@ -7,6 +7,7 @@ import (
 
 type QueueService interface {
 	Enqueue(ctx context.Context, jobID string, funcID string, metaData map[string]string) (error, bool)
+	DispatchOrEnqueue(ctx context.Context, jobID string, funcID string, metaData map[string]string) (error, bool)
 	ClaimNextJob(allowedRam int) (*CandidateJob, error)
 }
 

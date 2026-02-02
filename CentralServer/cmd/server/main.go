@@ -18,7 +18,6 @@ import (
 	gwinterfaces "central_server/internal/gateway/interfaces"
 	orchcore "central_server/internal/orchestrator/core"
 	navqueue "central_server/internal/queueService/core"
-	qscore "central_server/internal/queueService/core"
 	sinkcore "central_server/internal/sinkManager/core"
 	sinkhandler "central_server/internal/sinkManager/handler"
 	sinkinterfaces "central_server/internal/sinkManager/interfaces"
@@ -72,34 +71,50 @@ func main() {
 
 	// --- FUNCTION / COMPILER / ORCHESTRATOR WIRING ---
 
+<<<<<<< HEAD
 	// 1. Storage - Use PostgreSQL for functions
 	functionRepo := storage.NewPostgresFunctionRepo(userRepo.GetDB())
 	gatewayDB := functionRepo 
 	compilerRepo := functionRepo
+=======
+	// 1. Storage
+	lambdaRepo := storage.NewMemoryLambdaRepo()
+	gatewayDB := lambdaRepo
+	compilerRepo := lambdaRepo
+>>>>>>> 16d7b57203b122e0bcce904fb6466fbaf28fa986
 
 	// ObjectStore for Compiler
 	objectStore := storage.NewMemoryObjectStore()
-	
+
 	// Trigger for Compiler
-	trigger := &storage.DummyRunTrigger{} 
+	trigger := &storage.DummyRunTrigger{}
 
 	// 2. Queues
 	compQueue := domain.NewCompilationQueue()
 
-	queueServiceRaw := navqueue.NewQueueService()
+	queueService := navqueue.NewQueueService()
 
+<<<<<<< HEAD
 	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue, executionRepo)
 	orchestrator := orchcore.NewOrchestrator(functionRepo, lambdaService, queueServiceRaw)
+=======
+	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue)
+	orchestrator := orchcore.NewOrchestrator(lambdaRepo, lambdaService, queueService)
+>>>>>>> 16d7b57203b122e0bcce904fb6466fbaf28fa986
 	compiler := compilercore.NewCompiler(objectStore, trigger, compQueue, orchestrator)
 	go compiler.Start(ctx)
 
 	// 4. Wire Circular Dependencies
 	lambdaService.SetOrchestrator(orchestrator)
 
-
 	// 5. Handlers & Routers
 	lambdaHandler := gwhandler.NewLambdaHandler(lambdaService)
+<<<<<<< HEAD
     compatHandler := gwhandler.NewCompatHandler(lambdaService)
+=======
+	compatHandler := gwhandler.NewCompatHandler(lambdaService)
+	gatewayRouter := gwinterfaces.NewRouter(lambdaHandler, compatHandler, authHandler.AuthMiddleware)
+>>>>>>> 16d7b57203b122e0bcce904fb6466fbaf28fa986
 
     gatewayRouter := gwinterfaces.NewRouter(
 	lambdaHandler,
@@ -112,10 +127,12 @@ func main() {
 	resultRepo := storage.NewMemoryTaskResultRepo()
 	sinkClient := storage.DummySinkClient{}
 
-	// QueueService - directly wired to sinkManager
-	queueService := qscore.NewQueueService()
+	// QueueService - already created above
 
 	sinkService := sinkcore.NewSinkManagerService(sinkRepo, taskRepo, resultRepo, sinkClient, queueService, nil, "dev-secret")
+
+	// Break circular dependency
+	queueService.SetSinkManager(sinkService)
 	sinkHandler := sinkhandler.NewSinkHandler(sinkService)
 	sinkRouter := sinkinterfaces.NewRouter(sinkHandler, authHandler.AuthMiddleware)
 

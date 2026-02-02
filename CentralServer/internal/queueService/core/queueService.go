@@ -3,18 +3,21 @@ package core
 import (
 	"central_server/internal/queueService/domain"
 	"central_server/internal/queueService/interfaces"
+	sinkDomain "central_server/internal/sinkManager/domain"
 	"central_server/utils"
 	"context"
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type QueueService struct {
-	pool     *domain.QueuePool
-	selector QueueSelector
-	jobIndex map[string]string
-	mu       sync.Mutex
+	pool        *domain.QueuePool
+	selector    QueueSelector
+	jobIndex    map[string]string
+	sinkManager sinkDomain.SinkManagerService
+	mu          sync.Mutex
 }
 
 func NewQueueService() *QueueService {
@@ -28,6 +31,10 @@ func NewQueueService() *QueueService {
 		pool:     pool,
 		jobIndex: make(map[string]string),
 	}
+}
+
+func (s *QueueService) SetSinkManager(sm sinkDomain.SinkManagerService) {
+	s.sinkManager = sm
 }
 
 func (s *QueueService) Enqueue(ctx context.Context, jobID string, funcID string, metaData map[string]string) (error, bool) {
@@ -106,4 +113,34 @@ func (s *QueueService) ClaimNextJob(allowedRam int) (*interfaces.CandidateJob, e
 	}
 
 	return &chosen, nil
+}
+
+func (s *QueueService) DispatchOrEnqueue(ctx context.Context, jobID string, funcID string, metaData map[string]string) (error, bool) {
+	sinkID, active := s.sinkManager.GetSinkForLambda(ctx, funcID)
+	if active {
+		utils.Info(fmt.Sprintf("Lambda %s is active in sink %s. Dispatching directly.", funcID, sinkID))
+		input := make(map[string]interface{})
+		for k, v := range metaData {
+			input[k] = v
+		}
+
+		task := &sinkDomain.Task{
+			ExecutionID: jobID,
+			LambdaID:    funcID,
+			WasmRef:     metaData["wasmRef"],
+			Input:       input,
+			SinkID:      sinkID,
+			Status:      sinkDomain.TaskStatusPending,
+			CreatedAt:   time.Now().UTC(),
+		}
+
+		_, err := s.sinkManager.DeliverTask(ctx, task)
+		if err != nil {
+			utils.Error(fmt.Sprintf("Failed to deliver task to active sink %s: %v. Enqueuing instead.", sinkID, err))
+			// Fallback to enqueue
+			return s.Enqueue(ctx, jobID, funcID, metaData)
+		}
+		return nil, true
+	}
+	return s.Enqueue(ctx, jobID, funcID, metaData)
 }

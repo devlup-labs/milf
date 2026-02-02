@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 type LambdaService struct {
 	gatewayDB     interfaces.FuncGatewayDB
 	compilerRepo  interfaces.CompilerDB
@@ -20,7 +19,6 @@ type LambdaService struct {
 	compilerQueue *domain.CompilationQueue
 	executionRepo interfaces.ExecutionRepository
 }
-
 
 func NewLambdaService(
 	gatewayDB interfaces.FuncGatewayDB,
@@ -44,21 +42,22 @@ func (s *LambdaService) SetOrchestrator(orch interfaces.OrchestratorService) {
 
 // StoreLambda implements domain.LambdaService
 func (s *LambdaService) StoreLambda(ctx context.Context, req *domain.LambdaStoreRequest) (*domain.LambdaStoreResponse, error) {
-    // Reusing StoreandQueue logic
+	// Reusing StoreandQueue logic
 	_, err := s.StoreandQueue(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	// Return dummy response or constructed from req
 	return &domain.LambdaStoreResponse{
-		ID: req.FuncID,
-		Name: req.FuncID,
+		ID:      req.FuncID,
+		Name:    req.FuncID,
 		Message: "Stored and Queued",
 	}, nil
 }
 
 // TriggerLambda implements domain.LambdaService
 func (s *LambdaService) TriggerLambda(ctx context.Context, req *domain.LambdaExecRequest) (*domain.LambdaExecResponse, error) {
+<<<<<<< HEAD
     trigID := uuid.New().String()
     
     // Create execution record in database
@@ -92,6 +91,23 @@ func (s *LambdaService) TriggerLambda(ctx context.Context, req *domain.LambdaExe
     	Status:      status,
     	Message:     "Trigger sent",
     }, nil
+=======
+	// Map to SendTrigger?
+	// SendTrigger takes (funcID, input). req has ReferenceID which might be funcID?
+	// ValidateExecRequest checks ReferenceID.
+	ack, err := s.SendTrigger(ctx, req.ReferenceID, fmt.Sprintf("%v", req.Input))
+	if err != nil {
+		return nil, err
+	}
+	status := domain.ExecutionStatusPending
+	if ack {
+		status = domain.ExecutionStatusRunning // or pending
+	}
+	return &domain.LambdaExecResponse{
+		Status:  status,
+		Message: "Trigger sent",
+	}, nil
+>>>>>>> 16d7b57203b122e0bcce904fb6466fbaf28fa986
 }
 
 // ActivateLambda implements domain.LambdaService
@@ -108,7 +124,7 @@ func (s *LambdaService) ActivateLambda(ctx context.Context, req *domain.LambdaEx
 		msg = "Activation successful"
 	}
 	return &domain.LambdaExecResponse{
-		Status: domain.ExecutionStatusRunning,
+		Status:  domain.ExecutionStatusRunning,
 		Message: msg,
 	}, nil
 }
@@ -119,7 +135,7 @@ func (s *LambdaService) DeactivateLambda(ctx context.Context, req *domain.Lambda
 		return nil, domain.ErrInvalidRequest
 	}
 
-	ack, err := s.DeactivateJob(ctx, req.ReferenceID, "") 
+	ack, err := s.DeactivateJob(ctx, req.ReferenceID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +144,7 @@ func (s *LambdaService) DeactivateLambda(ctx context.Context, req *domain.Lambda
 		msg = "Deactivation successful"
 	}
 	return &domain.LambdaExecResponse{
-		Status: domain.ExecutionStatusCompleted,
+		Status:  domain.ExecutionStatusCompleted,
 		Message: msg,
 	}, nil
 }
@@ -151,15 +167,14 @@ func (s *LambdaService) GetExecution(ctx context.Context, executionID string) (*
 	}, nil
 }
 
-//func to store the lambda in database of func gateway(one with low TTL) anmd add a job to compilation queue
-func (s* LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaStoreRequest) (bool, error) {
+// func to store the lambda in database of func gateway(one with low TTL) anmd add a job to compilation queue
+func (s *LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaStoreRequest) (bool, error) {
 	utils.Info(fmt.Sprintf("[Gateway] Received StoreAndQueue request for FuncID: %s, UserID: %s", req.FuncID, req.UserID))
 
 	if err := domain.ValidateStoreRequest(req); err != nil {
 		utils.Error(fmt.Sprintf("[Gateway] Validation failed for FuncID: %s. Error: %v", req.FuncID, err))
 		return false, err
 	}
-	
 
 	lambda := &domain.Lambda{
 		ID:         req.FuncID,
@@ -181,26 +196,25 @@ func (s* LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaSto
 	}
 	utils.Info(fmt.Sprintf("[Gateway] Lambda %s saved to DB successfully", req.FuncID))
 
-	if(s.compilerQueue.JobsMap[req.FuncID]!=nil){
+	if s.compilerQueue.JobsMap[req.FuncID] != nil {
 		utils.Info(fmt.Sprintf("[Gateway] Job for %s already exists in queue, skipping enqueue", req.FuncID))
 		return true, nil
 	}
 
 	err = s.compilerQueue.AddJob(&domain.CompilationQueueObject{
 		FuncID: req.FuncID,
-	})	    
+	})
 	if err != nil {
 		errMsg := fmt.Sprintf("[Gateway] Error adding job to compilation queue: %v", err)
 		utils.Error(errMsg)
 		return false, err
 	}
 	utils.Info(fmt.Sprintf("[Gateway] Job for %s added to CompilationQueue", req.FuncID))
-	return true, nil     
+	return true, nil
 }
 
-
-func (s* LambdaService) Activate(ctx context.Context, funcID string)(bool, error){
-	if(funcID==""){
+func (s *LambdaService) Activate(ctx context.Context, funcID string) (bool, error) {
+	if funcID == "" {
 		return false, domain.ErrExecutionFailed
 	}
 	// Check if orchestrator is set
@@ -208,7 +222,7 @@ func (s* LambdaService) Activate(ctx context.Context, funcID string)(bool, error
 		return false, errors.New("orchestrator not initialized")
 	}
 	ack, err := s.orchestrator.ActivateService(ctx, funcID)
-	if(err!=nil){
+	if err != nil {
 		errMsg := fmt.Sprintf("Error activating the service: %v", err)
 		utils.Error(errMsg)
 		return false, err
@@ -216,13 +230,13 @@ func (s* LambdaService) Activate(ctx context.Context, funcID string)(bool, error
 	return ack, nil
 }
 
-//func to send a deactivate service req to orchestrator
-func (s* LambdaService) DeactivateJob(ctx context.Context, funcID string, userID string)(bool, error){
-	if(funcID==""){
+// func to send a deactivate service req to orchestrator
+func (s *LambdaService) DeactivateJob(ctx context.Context, funcID string, userID string) (bool, error) {
+	if funcID == "" {
 		return false, domain.ErrExecutionFailed
 	}
 	ack, err := s.orchestrator.DeactivateService(ctx, funcID)
-	if(err!=nil){
+	if err != nil {
 		errMsg := fmt.Sprintf("Error deactivating the service: %v", err)
 		utils.Error(errMsg)
 		return false, err
@@ -230,14 +244,14 @@ func (s* LambdaService) DeactivateJob(ctx context.Context, funcID string, userID
 	return ack, nil
 }
 
-//func to send a trigger for a service to orchestrator
-func (s* LambdaService) SendTrigger(ctx context.Context, funcID string, input string)(bool, error){
-	if(funcID==""){
+// func to send a trigger for a service to orchestrator
+func (s *LambdaService) SendTrigger(ctx context.Context, funcID string, input string) (bool, error) {
+	if funcID == "" {
 		return false, domain.ErrExecutionFailed
 	}
 	trigID := uuid.New().String()
 	ack, err := s.orchestrator.ReceiveTrigger(ctx, trigID, funcID, input)
-	if(err!=nil){
+	if err != nil {
 		errMsg := fmt.Sprintf("Error sending trigger to orchestrator: %v", err)
 		utils.Error(errMsg)
 		return false, err
@@ -245,6 +259,7 @@ func (s* LambdaService) SendTrigger(ctx context.Context, funcID string, input st
 	return ack, nil
 }
 
+<<<<<<< HEAD
 func (s* LambdaService) SendTriggerWithID(ctx context.Context, trigID string, funcID string, input string)(bool, error){
 	if(funcID==""){
 		return false, domain.ErrExecutionFailed
@@ -260,20 +275,40 @@ func (s* LambdaService) SendTriggerWithID(ctx context.Context, trigID string, fu
 
 func (s* LambdaService) GetStatus(ctx context.Context, funcID string)(string, error){
     if(funcID==""){
+=======
+func (s *LambdaService) GetStatus(ctx context.Context, funcID string) (string, error) {
+	if funcID == "" {
+>>>>>>> 16d7b57203b122e0bcce904fb6466fbaf28fa986
 		return "", domain.ErrExecutionFailed
 	}
 	exist, _ := s.compilerQueue.JobsMap[funcID]
-	if(exist!=nil){
+	if exist != nil {
 		return "In Queue", nil
-	}else if status, err := s.compilerRepo.GetStatus(ctx, funcID); err==nil{
+	} else if status, err := s.compilerRepo.GetStatus(ctx, funcID); err == nil {
 		return status, nil
-	}else{
+	} else {
 		return "still compiling", nil
 	}
 }
 
-func (s* LambdaService) ActivateJob(ctx context.Context, funcID string, userID string)(bool, error){
-
-	// logic for route mapping ot be done 
+func (s *LambdaService) ActivateJob(ctx context.Context, funcID string, userID string) (bool, error) {
+	// This method is called by Orchestrator during activation.
+	// We can use this to set up any gateway-specific routing or logging.
+	utils.Info(fmt.Sprintf("[Gateway] Service activated for FuncID: %s, UserID: %s", funcID, userID))
 	return true, nil
+}
+
+func (s *LambdaService) ExecuteJob(ctx context.Context, funcID string, input string) (bool, error) {
+	if funcID == "" {
+		return false, domain.ErrInvalidRequest
+	}
+
+	trigID := uuid.New().String()
+	ack, err := s.orchestrator.ReceiveTrigger(ctx, trigID, funcID, input)
+	if err != nil {
+		utils.Error(fmt.Sprintf("[Gateway] Error sending trigger for %s: %v", funcID, err))
+		return false, err
+	}
+
+	return ack, nil
 }

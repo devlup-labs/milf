@@ -192,6 +192,7 @@ type SinkManagerService interface {
 	GetTaskResult(ctx context.Context, executionID string) (*TaskResult, error)
 	StartStaleDetector(ctx context.Context, staleThreshold time.Duration)
 	StopStaleDetector()
+	GetSinkForLambda(ctx context.Context, lambdaID string) (string, bool)
 }
 
 type ResultCallback func(ctx context.Context, executionID string, result interface{}, err error)
