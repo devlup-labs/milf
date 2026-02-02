@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/joho/godotenv"
 
 	authcore "central_server/internal/auth/core"
 	authhandler "central_server/internal/auth/handler"
@@ -24,17 +28,54 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Auth
-	userRepo := storage.NewMemoryUserRepo()
+	// Load .env file
+	godotenv.Load(".env")
+
+	// Load database configuration from environment variables
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "central_server_db"
+	}
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "postgres"
+	}
+	dbPassword := os.Getenv("DB_PASSWORD")
+	if dbPassword == "" {
+		log.Fatal("DB_PASSWORD environment variable not set")
+	}
+
+	// Build connection string
+	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	// Auth - Connect to PostgreSQL
+	userRepo, err := storage.NewPostgresUserRepo(connString)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer userRepo.Close()
+	
+	// Execution repository (same database connection)
+	executionRepo := storage.NewPostgresExecutionRepo(userRepo.GetDB())
+	
 	authService := authcore.NewAuthService(userRepo, "dev-secret")
 	authHandler := authhandler.NewAuthHandler(authService)
 
 	// --- FUNCTION / COMPILER / ORCHESTRATOR WIRING ---
 
-	// 1. Storage
-	lambdaRepo := storage.NewMemoryLambdaRepo()
-	gatewayDB := lambdaRepo 
-	compilerRepo := lambdaRepo 
+	// 1. Storage - Use PostgreSQL for functions
+	functionRepo := storage.NewPostgresFunctionRepo(userRepo.GetDB())
+	gatewayDB := functionRepo 
+	compilerRepo := functionRepo
 
 	// ObjectStore for Compiler
 	objectStore := storage.NewMemoryObjectStore()
@@ -47,20 +88,24 @@ func main() {
 
 	queueServiceRaw := navqueue.NewQueueService()
 
-	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue)
-	orchestrator := orchcore.NewOrchestrator(lambdaRepo, lambdaService, queueServiceRaw)
+	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue, executionRepo)
+	orchestrator := orchcore.NewOrchestrator(functionRepo, lambdaService, queueServiceRaw)
 	compiler := compilercore.NewCompiler(objectStore, trigger, compQueue, orchestrator)
 	go compiler.Start(ctx)
 
 	// 4. Wire Circular Dependencies
 	lambdaService.SetOrchestrator(orchestrator)
-	// lambdaService.SetCompiler(compiler) // Removed as not used by Gateway directly
 
 
 	// 5. Handlers & Routers
 	lambdaHandler := gwhandler.NewLambdaHandler(lambdaService)
-	gatewayRouter := gwinterfaces.NewRouter(lambdaHandler, authHandler.AuthMiddleware)
+    compatHandler := gwhandler.NewCompatHandler(lambdaService)
 
+    gatewayRouter := gwinterfaces.NewRouter(
+	lambdaHandler,
+	compatHandler,
+	authHandler.AuthMiddleware,
+)
 	// --- SINK MANAGER ---
 	sinkRepo := storage.NewMemorySinkRepo()
 	taskRepo := storage.NewMemoryTaskRepo()
@@ -85,6 +130,10 @@ func main() {
 	mux.Handle("/api/v1/lambdas/", gatewayMux)
 	mux.Handle("/api/v1/executions/", gatewayMux)
 	mux.Handle("/health", gatewayMux)
+
+	mux.Handle("/functions", gatewayMux)
+    mux.Handle("/functions/", gatewayMux)
+    mux.Handle("/invocations", gatewayMux)
 
 	// Mount sink manager routes
 	sinkMux := sinkRouter.Setup()

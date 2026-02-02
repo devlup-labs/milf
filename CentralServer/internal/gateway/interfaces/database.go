@@ -15,3 +15,9 @@ type FuncGatewayDB interface {
 type CompilerDB interface {
 	GetStatus(ctx context.Context, funcID string) (string, error) 
 }
+
+type ExecutionRepository interface {
+	Create(ctx context.Context, execution *domain.Execution) error
+	GetByID(ctx context.Context, id string) (*domain.Execution, error)
+	UpdateStatus(ctx context.Context, id string, status domain.ExecutionStatus, output interface{}, errorMsg string) error
+}

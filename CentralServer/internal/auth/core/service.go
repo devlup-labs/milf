@@ -31,9 +31,7 @@ func (s *AuthService) Register(ctx context.Context, username, password string) e
 		return err
 	}
 
-	// UUID generation could be better, using username as ID for simplicity in this MVP
 	user := &domain.User{
-		ID:       username,
 		Username: username,
 		Password: string(hash),
 	}

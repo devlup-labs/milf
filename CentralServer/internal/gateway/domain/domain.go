@@ -53,6 +53,7 @@ const (
 
 type Lambda struct {
 	ID         string             `json:"id"`
+	UserID     string             `json:"user_id"`
 	Name       string             `json:"name"`
 	SourceCode []byte             `json:"source_code"`
 	Runtime    RuntimeEnvironment `json:"runtime"`

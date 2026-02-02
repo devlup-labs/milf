@@ -67,13 +67,14 @@ func (h *AuthHandler) AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		tokenString := parts[1]
-		_, err := h.authService.VerifyToken(r.Context(), tokenString)
+		claims, err := h.authService.VerifyToken(r.Context(), tokenString)
 		if err != nil {
 			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 
-		// Token is valid, proceed
-		next.ServeHTTP(w, r)
+		// Token is valid, add identity to context and proceed
+		ctx := domain.WithAuthContext(r.Context(), claims.UserID, claims.Username)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

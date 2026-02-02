@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
-	"net/http"
+	"net/http"	
+	"time"
 
+	authdomain "central_server/internal/auth/domain"
 	"central_server/internal/gateway/domain"
 )
 
@@ -57,7 +59,7 @@ func (h *CompatHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Name       string                 `json:"name"`
 		Runtime    string                 `json:"runtime"`
 		Memory     int                    `json:"memory"`
-		SourceCode []byte                 `json:"sourceCode"`
+		SourceCode string                 `json:"sourceCode"`
 		MetaData   map[string]string      `json:"metadata,omitempty"`
 	}
 
@@ -67,10 +69,16 @@ func (h *CompatHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Translate → Gateway store request
+	userID, ok := authdomain.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	storeReq := &domain.LambdaStoreRequest{
-		UserID:     "compat-user", // temporary (auth-based later)
+		UserID:     userID,
 		FuncID:     req.Name,
-		SourceCode: req.SourceCode,
+		SourceCode: []byte(req.SourceCode),
 		Runtime:    domain.RuntimeEnvironment(req.Runtime),
 		MemoryMB:   req.Memory,
 		RunType:    domain.RunTypeOnCommand,

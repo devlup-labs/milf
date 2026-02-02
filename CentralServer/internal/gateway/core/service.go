@@ -14,10 +14,11 @@ import (
 
 
 type LambdaService struct {
-	gatewayDB   interfaces.FuncGatewayDB
-	compilerRepo interfaces.CompilerDB
-	orchestrator interfaces.OrchestratorService
+	gatewayDB     interfaces.FuncGatewayDB
+	compilerRepo  interfaces.CompilerDB
+	orchestrator  interfaces.OrchestratorService
 	compilerQueue *domain.CompilationQueue
+	executionRepo interfaces.ExecutionRepository
 }
 
 
@@ -26,12 +27,14 @@ func NewLambdaService(
 	compilerRepo interfaces.CompilerDB,
 	orchestrator interfaces.OrchestratorService,
 	compilerQueue *domain.CompilationQueue,
+	executionRepo interfaces.ExecutionRepository,
 ) *LambdaService {
 	return &LambdaService{
 		gatewayDB:     gatewayDB,
 		compilerRepo:  compilerRepo,
 		orchestrator:  orchestrator,
 		compilerQueue: compilerQueue,
+		executionRepo: executionRepo,
 	}
 }
 
@@ -56,20 +59,38 @@ func (s *LambdaService) StoreLambda(ctx context.Context, req *domain.LambdaStore
 
 // TriggerLambda implements domain.LambdaService
 func (s *LambdaService) TriggerLambda(ctx context.Context, req *domain.LambdaExecRequest) (*domain.LambdaExecResponse, error) {
-    // Map to SendTrigger?
-    // SendTrigger takes (funcID, input). req has ReferenceID which might be funcID?
-    // ValidateExecRequest checks ReferenceID.
-    ack, err := s.SendTrigger(ctx, req.ReferenceID, fmt.Sprintf("%v", req.Input))
+    trigID := uuid.New().String()
+    
+    // Create execution record in database
+    execution := &domain.Execution{
+    	ID:          trigID,
+    	LambdaID:    req.ReferenceID,
+    	ReferenceID: req.ReferenceID,
+    	Input:       req.Input,
+    	Status:      domain.ExecutionStatusPending,
+    	StartedAt:   time.Now(),
+    }
+    
+    if s.executionRepo != nil {
+    	if err := s.executionRepo.Create(ctx, execution); err != nil {
+    		utils.Error(fmt.Sprintf("Failed to create execution record: %v", err))
+    	}
+    }
+    
+    ack, err := s.SendTriggerWithID(ctx, trigID, req.ReferenceID, fmt.Sprintf("%v", req.Input))
     if err != nil {
     	return nil, err
     }
+    
     status := domain.ExecutionStatusPending
     if ack {
-    	status = domain.ExecutionStatusRunning // or pending
+    	status = domain.ExecutionStatusRunning
     }
+    
     return &domain.LambdaExecResponse{
-    	Status: status,
-    	Message: "Trigger sent",
+    	ExecutionID: trigID,
+    	Status:      status,
+    	Message:     "Trigger sent",
     }, nil
 }
 
@@ -117,8 +138,17 @@ func (s *LambdaService) GetLambda(ctx context.Context, lambdaID string) (*domain
 }
 
 func (s *LambdaService) GetExecution(ctx context.Context, executionID string) (*domain.Execution, error) {
-	// Not implemented yet in DB interface?
-	return nil, errors.New("not implemented")
+	if s.executionRepo != nil {
+		return s.executionRepo.GetByID(ctx, executionID)
+	}
+	
+	// Fallback if no repo configured
+	return &domain.Execution{
+		ID:        executionID,
+		Status:    domain.ExecutionStatusPending,
+		StartedAt: time.Now(),
+		Input:     make(map[string]interface{}),
+	}, nil
 }
 
 //func to store the lambda in database of func gateway(one with low TTL) anmd add a job to compilation queue
@@ -133,6 +163,7 @@ func (s* LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaSto
 
 	lambda := &domain.Lambda{
 		ID:         req.FuncID,
+		UserID:     req.UserID,
 		Name:       req.FuncID,
 		SourceCode: req.SourceCode,
 		Runtime:    req.Runtime,
@@ -205,6 +236,19 @@ func (s* LambdaService) SendTrigger(ctx context.Context, funcID string, input st
 		return false, domain.ErrExecutionFailed
 	}
 	trigID := uuid.New().String()
+	ack, err := s.orchestrator.ReceiveTrigger(ctx, trigID, funcID, input)
+	if(err!=nil){
+		errMsg := fmt.Sprintf("Error sending trigger to orchestrator: %v", err)
+		utils.Error(errMsg)
+		return false, err
+	}
+	return ack, nil
+}
+
+func (s* LambdaService) SendTriggerWithID(ctx context.Context, trigID string, funcID string, input string)(bool, error){
+	if(funcID==""){
+		return false, domain.ErrExecutionFailed
+	}
 	ack, err := s.orchestrator.ReceiveTrigger(ctx, trigID, funcID, input)
 	if(err!=nil){
 		errMsg := fmt.Sprintf("Error sending trigger to orchestrator: %v", err)
