@@ -1,0 +1,23 @@
+WAMR Android Integration
+ Explore existing Android project structure -- 
+ Check JNI/stub implementations -- 
+ Check CMake configuration -- 
+ Configure WAMR build -- 
+ Ensure -- 
+wamr
+ submodule or source is present
+ Configure 
+CMakeLists.txt
+ for execution-only build
+ Implement Native/JNI Bridge
+ C++ function to instantiate WASM module
+ C++ function to run formatted main/export
+ Implement Android Service for Sandbox
+ Verify isolatedProcess service setup. 
+ IPC mechanism (AIDL) for sending WASM bytes and receiving output.  ☑️
+ Flutter Side Implementation. 
+ File picker to select WASM file 
+ MethodChannel to send file to Android Native  ☑️
+
+
+
