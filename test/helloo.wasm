@@ -1,0 +1,23 @@
+hello():
+        push    rbp
+        mov     rbp, rsp
+        movabs  rax, 8022916924116329800
+        mov     edx, 6581362
+        mov     QWORD PTR [rbp-112], rax
+        mov     QWORD PTR [rbp-104], rdx
+        mov     QWORD PTR [rbp-96], 0
+        mov     QWORD PTR [rbp-88], 0
+        mov     QWORD PTR [rbp-80], 0
+        mov     QWORD PTR [rbp-72], 0
+        mov     QWORD PTR [rbp-64], 0
+        mov     QWORD PTR [rbp-56], 0
+        mov     QWORD PTR [rbp-48], 0
+        mov     QWORD PTR [rbp-40], 0
+        mov     QWORD PTR [rbp-32], 0
+        mov     QWORD PTR [rbp-24], 0
+        mov     DWORD PTR [rbp-16], 0
+        lea     rax, [rbp-112]
+        mov     QWORD PTR [rbp-8], rax
+        mov     rax, QWORD PTR [rbp-8]
+        pop     rbp
+        ret
