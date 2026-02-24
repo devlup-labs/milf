@@ -22,13 +22,12 @@ const sourceTypes = [
 ];
 
 const runtimes = [
-  { value: "go1.21", label: "Go 1.21" },
-  { value: "node18", label: "Node.js 18" },
-  { value: "node20", label: "Node.js 20" },
-  { value: "python3.10", label: "Python 3.10" },
-  { value: "python3.11", label: "Python 3.11" },
-  { value: "java17", label: "Java 17" },
-  { value: "dotnet6", label: ".NET 6" },
+  { value: "c", label: "C (WASI)" },
+  { value: "cpp", label: "C++ (WASI)" },
+  { value: "go", label: "Go" },
+  { value: "rust", label: "Rust" },
+  { value: "python", label: "Python" },
+  { value: "javascript", label: "JavaScript" },
 ];
 
 const STORAGE_KEY = "dark-canvas-create-function-draft";
@@ -47,8 +46,8 @@ export default function CreateFunction() {
   const [formData, setFormData] = useState({
     name: "",
     sourceType: "inline",
-    code: `package main\n\nimport(\n    "context"\n    "encoding/json"\n) \n\nfunc Handler(ctx context.Context, event json.RawMessage)(interface{}, error) { \n    return map[string]string{ "message": "Hello, World!" }, nil\n } `,
-    runtime: "go1.21",
+    code: `#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}\n`,
+    runtime: "c",
     memory: 128,
     timeout: 30,
     envVars: [{ key: "", value: "" }],

@@ -112,7 +112,7 @@ export function useInvocations(query?: { q?: string; status?: "success" | "error
         queryKey: keys.invocations.list(query),
         queryFn: () => {
             if (!session?.token) throw new Error("Not authenticated");
-            return api.listInvocations(session.token, { q: query?.q });
+            return api.listInvocations(session.token, { q: query?.q, status: query?.status });
         },
         enabled: !!session?.token,
     });

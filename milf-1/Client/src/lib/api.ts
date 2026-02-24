@@ -29,14 +29,9 @@ export async function register(username: string, password: string): Promise<void
 
 /* Functions (CREATE, GET, DELETE) */
 export async function createFunction(data: any, token: string): Promise<any> {
-  // Map frontend runtime to backend runtime
+  // Runtime values now match backend directly
   const mapRuntime = (runtime: string) => {
-    if (runtime.startsWith('go')) return 'go';
-    if (runtime.startsWith('node')) return 'javascript';
-    if (runtime.startsWith('python')) return 'python';
-    if (runtime.startsWith('java')) return 'java';
-    if (runtime.startsWith('dotnet')) return 'javascript';
-    return 'go';
+    return runtime;
   };
 
   const res = await fetch(`${API_BASE_URL}/functions/create`, {
@@ -145,7 +140,7 @@ export async function listInvocations(token: string, query?: {q?: string; status
     requestId: exec.id,
     functionId: exec.functionId || exec.lambda_id,
     functionName: exec.functionName || exec.functionId || exec.lambda_id || "Unknown",
-    status: exec.status === "completed" || exec.status === "running" ? "success" : "error",
+    status: exec.status === "completed" ? "success" : exec.status === "failed" ? "error" : exec.status === "running" ? "running" : "pending",
     durationMs: 0, // Backend doesn't track this yet
     memoryUsedMb: 0, // Backend doesn't track this yet
     timestamp: exec.startedAt || new Date().toISOString(),

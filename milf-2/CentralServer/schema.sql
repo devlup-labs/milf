@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS functions (
     memory INT,
     memory_mb INT,
     source_code TEXT,
-    wasm_ref VARCHAR(255),
+    wasm_ref BYTEA,
     run_type VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

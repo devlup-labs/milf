@@ -62,9 +62,20 @@ func (s *PostgresObjectStore) FetchCompilationRequest(lambdaID string) (compiler
 		compilerRuntime = compilerdomain.RuntimeGo
 	}
 	
-	// Convert source code bytes to SourceFile
+	// Convert source code bytes to SourceFile with correct extension per runtime
+	var sourcePath string
+	switch compilerRuntime {
+	case compilerdomain.RuntimeC:
+		sourcePath = "main.c"
+	case compilerdomain.RuntimeCpp:
+		sourcePath = "main.cpp"
+	case compilerdomain.RuntimeRust:
+		sourcePath = "main.rs"
+	default:
+		sourcePath = "main.go"
+	}
 	sourceFile := compilerdomain.SourceFile{
-		Path:    "main.go", // Default name, could be dynamic based on runtime
+		Path:    sourcePath,
 		Content: lambda.SourceCode,
 	}
 	

@@ -55,8 +55,8 @@ export default function Invocations() {
       key: "status",
       header: "Status",
       render: (inv: InvocationEntity) => (
-        <StatusBadge status={inv.status === "success" ? "success" : "error"}>
-          {inv.status === "success" ? "Success" : "Failed"}
+        <StatusBadge status={inv.status === "success" ? "success" : inv.status === "error" ? "error" : "pending"}>
+          {inv.status === "success" ? "Success" : inv.status === "error" ? "Failed" : inv.status === "running" ? "Running" : "Pending"}
         </StatusBadge>
       ),
     },

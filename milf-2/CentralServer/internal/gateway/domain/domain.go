@@ -201,7 +201,7 @@ func ValidateExecRequest(req *LambdaExecRequest) error {
 
 func IsValidRuntime(rt RuntimeEnvironment) bool {
 	switch rt {
-	case RuntimeGo, RuntimeRust, RuntimePython, RuntimeJavaScript:
+	case RuntimeGo, RuntimeRust, RuntimePython, RuntimeJavaScript, RuntimeC, RuntimeCpp:
 		return true
 	default:
 		return false
