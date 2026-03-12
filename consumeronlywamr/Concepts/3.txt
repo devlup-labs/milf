@@ -1,0 +1,34 @@
+
+
+
+This is the implementation of the wamr :
+
+1. Flutter (UI Layer) -- lite hai
+    simple UI hai : function name (String) and arguments (Int List) leta hai.
+    Execution log me integer values show karta hai (return values).
+
+2. AIDL (IPC Layer) :
+    Methods define karta hai jo App aur Isolated Process ke beech baat karte hain.
+    Example: `invokeWasm(bytes, funcName, args)` acts as the contract.
+
+3. Kotlin (Android Core) :
+    MainActivity : Flutter se MethodChannel receive karta hai, Service ko bind/unbind karta hai.
+    
+    WASMService (The Isolated "Bodyguard") : 
+        Ye `android:isolatedProcess=true` hai (alag process mein chalta hai).
+        Ye actual marshalling karta hai (Primitives pass karta hai, JSON nahi!).
+        JNI Call: `invokeWasm(...)` -> calls C++ native function.
+
+4. Cpp (Native Engine) :
+    wamr : Repo cloned hai, but CMakeLists.txt and `native-lib.cpp` are the brain.
+    We use "Execution-only mode" (fast interpreter), compiled wasm skip kiya hai.
+    
+    native-lib.cpp (The Brain) :
+    1. Load: Bytes ko buffer me load karta hai.
+    2. Instantiate: Module instance banata hai.
+    3. Lookup: Function name (string) se function dhundhta hai.
+    4. Execute: Call karta hai aur result return karta hai.
+    
+    Auxiliary files : Monitor (execution limit), Memory Tracker.
+
+
