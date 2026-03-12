@@ -72,7 +72,7 @@ func (o *Orchestrator) ReceiveTrigger(ctx context.Context, trigID string, funcID
 		metaData = o.Funcs[funcID]
 	}
 	o.trigJob[jobID] = trigID
-	err, ack := o.QueueService.DispatchOrEnqueue(ctx, jobID, funcID, metaData)
+	err, ack := o.QueueService.DispatchOrEnqueue(ctx, jobID, funcID, input, metaData)
 	if err != nil {
 		utils.Error("Failed to enqueue job for funcID: " + funcID + ", trigID: " + trigID + ", error: " + err.Error())
 		return false, err

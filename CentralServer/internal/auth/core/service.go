@@ -7,6 +7,7 @@ import (
 
 	"central_server/internal/auth/domain"
 	"central_server/internal/auth/interfaces"
+	"central_server/internal/policy"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -17,29 +18,34 @@ type AuthService struct {
 	userRepo       interfaces.UserRepository
 	jwtSecret      []byte
 	googleClientID string
+	policyMgr      *policy.Manager
 }
 
-func NewAuthService(repo interfaces.UserRepository, secret string, googleClientID string) *AuthService {
+func NewAuthService(repo interfaces.UserRepository, secret string, googleClientID string, pm *policy.Manager) *AuthService {
 	return &AuthService{
 		userRepo:       repo,
 		jwtSecret:      []byte(secret),
 		googleClientID: googleClientID,
+		policyMgr:      pm,
 	}
 }
 
 func (s *AuthService) Register(ctx context.Context, username, password string) error {
-	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
-	user := &domain.User{
-		Username: username,
-		Password: string(hash),
+	user := &domain.User{Username: username, Password: string(hash)}
+	if err := s.userRepo.Create(ctx, user); err != nil {
+		return err
 	}
 
-	return s.userRepo.Create(ctx, user)
+	// Auto-initialize policy and billing for new user
+	if s.policyMgr != nil && user.ID != "" {
+		_ = s.policyMgr.InitForUser(ctx, user.ID)
+	}
+	return nil
 }
 
 func (s *AuthService) Login(ctx context.Context, username, password string) (string, error) {

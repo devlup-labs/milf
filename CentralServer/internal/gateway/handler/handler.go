@@ -137,7 +137,16 @@ func (h *LambdaHandler) GetExecution(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, execution)
+	// Return in snake_case so the frontend polling hook can read status/output correctly
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"id":          execution.ID,
+		"lambda_id":   execution.LambdaID,
+		"status":      string(execution.Status),
+		"output":      execution.Output,
+		"error":       execution.Error,
+		"started_at":  execution.StartedAt,
+		"finished_at": execution.FinishedAt,
+	})
 }
 
 func (h *LambdaHandler) GetWasm(w http.ResponseWriter, r *http.Request) {

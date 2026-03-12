@@ -116,18 +116,28 @@ export async function deleteFunction(id: string, token: string): Promise<void> {
 
 /* Invoke */
 export async function invokeFunction(id: string, input: any, token: string): Promise<any> {
+  // input is already a TaskEnvelope JSON string like: '{"type":"json","data":{"a":10}}'  
+  // Parse it so we can send it as a proper JSON object, not a double-encoded string
+  let inputObj: unknown;
+  if (typeof input === "string") {
+    try {
+      inputObj = JSON.parse(input);
+    } catch {
+      inputObj = { type: "json", data: input };
+    }
+  } else {
+    inputObj = input;
+  }
+
   const res = await fetch(`${API_BASE_URL}/functions/invoke`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      id,
-      input: typeof input === "string" ? JSON.parse(input) : input
-    }),
+    body: JSON.stringify({ id, input: inputObj }),
   });
-  if (!res.ok) throw new Error("Invoke failed");
+  if (!res.ok) throw new Error(await res.text() || "Invoke failed");
   return res.json();
 }
 
@@ -164,7 +174,17 @@ export async function getExecution(id: string, token: string): Promise<any> {
     headers: { "Authorization": `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("Execution not found");
-  return res.json();
+  const data = await res.json();
+  // Normalise to camelCase fields the frontend uses 
+  return {
+    id: data.id,
+    lambdaId: data.lambda_id,
+    status: data.status,      // "pending" | "running" | "completed" | "failed"
+    output: data.output,
+    error: data.error,
+    startedAt: data.started_at,
+    finishedAt: data.finished_at,
+  };
 }
 
 /* Logs */

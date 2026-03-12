@@ -1,182 +1,253 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:flutter/services.dart';
 
+typedef TaskCallback = Future<void> Function({
+  required String executionId,
+  required String lambdaId,
+  required Uint8List wasmBytes,
+  required Uint8List payload,
+});
+
+/// Decodes the typed input envelope sent by the server.
+/// The server MUST tag the input type to disambiguate:
+///   {"type": "json",   "data": {...}}   → serialize to UTF-8 bytes
+///   {"type": "binary", "data": "<b64>"} → decode from base64 bytes
+///   {"type": "null"}                    → empty payload
+Uint8List _decodeTaskInput(Map<String, dynamic>? input) {
+  if (input == null || input['type'] == 'null') return Uint8List(0);
+  if (input['type'] == 'binary') {
+    return base64Decode(input['data'] as String);
+  }
+  // Default: treat as JSON → UTF-8 bytes
+  return Uint8List.fromList(utf8.encode(jsonEncode(input['data'] ?? {})));
+}
+
+/// Hardened WebSocket manager for the MILF node.
+/// Handles: JWT auth, auto-reconnect with exponential backoff, periodic heartbeat.
 class CloudSync {
-  static const platform = MethodChannel('com.example.consumeronlywamr/wasm');
-  
   final String serverUrl;
-  String? sinkId;
-  WebSocketChannel? _channel;
-  bool isConnected = false;
-  final Function(String) onLog;
+  final String authToken;
+  final void Function(String) onLog;
+  final void Function(String) onSinkRegistered;
+  final TaskCallback onTaskReceived;
+  final VoidCallback onDisconnected;
 
-  CloudSync({required this.serverUrl, required this.onLog});
+  String? _sinkId;
+  WebSocketChannel? _channel;
+  bool _intentionalDisconnect = false;
+  bool isConnected = false;
+
+  int _retryDelaySecs = 2;
+  Timer? _heartbeatTimer;
+
+  CloudSync({
+    required this.serverUrl,
+    required this.authToken,
+    required this.onLog,
+    required this.onSinkRegistered,
+    required this.onTaskReceived,
+    required this.onDisconnected,
+  });
 
   Future<void> connect() async {
-    try {
-      // 1. Register Sink to get ID
-      onLog("Registering sink with $serverUrl...");
-      final regRes = await http.post(
-        Uri.parse('$serverUrl/api/v1/sinks/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': 'node_${DateTime.now().millisecondsSinceEpoch}@milf.local',
-          'password': 'password123',
-          'endpoint': 'ws-connected-node'
-        }),
-      );
-
-      if (regRes.statusCode == 201) {
-        final data = jsonDecode(regRes.body);
-        sinkId = data['sink_id'];
-        onLog("Registered! SinkID: $sinkId");
-      } else {
-        onLog("Failed to register: ${regRes.body}");
-        return;
-      }
-
-      // 2. Connect WebSocket
-      final wsUrl = serverUrl.replaceFirst('http', 'ws');
-      final uri = Uri.parse('$wsUrl/api/v1/sinks/ws?sinkId=$sinkId');
-      
-      onLog("Connecting to WebSocket: $uri");
-      _channel = WebSocketChannel.connect(uri);
-      isConnected = true;
-
-      // 3. Listen for incoming Tasks
-      _channel!.stream.listen((message) {
-        _handleMessage(message);
-      }, onDone: () {
-        isConnected = false;
-        onLog("WebSocket disconnected.");
-      }, onError: (error) {
-        isConnected = false;
-        onLog("WebSocket error: $error");
-      });
-
-      // Send initial heartbeat
-      _sendHeartbeat();
-
-    } catch (e) {
-      isConnected = false;
-      onLog("Connection error: $e");
-    }
+    _intentionalDisconnect = false;
+    await _register();
   }
 
   void disconnect() {
+    _intentionalDisconnect = true;
+    _heartbeatTimer?.cancel();
     _channel?.sink.close();
     isConnected = false;
-    onLog("Disconnected from server.");
+    onDisconnected();
+  }
+
+  // ── Registration ──────────────────────────────────────────────────────────
+
+  Future<void> _register() async {
+    try {
+      onLog('Registering node with server...');
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        if (authToken.isNotEmpty) 'Authorization': 'Bearer $authToken',
+      };
+
+      final res = await http.post(
+        Uri.parse('$serverUrl/api/v1/sinks/register'),
+        headers: headers,
+        body: jsonEncode({
+          'email': 'node_${DateTime.now().millisecondsSinceEpoch}@milf.local',
+          'password': 'unused',
+          'endpoint': 'ws-node',
+        }),
+      );
+
+      if (res.statusCode == 201) {
+        final data = jsonDecode(res.body);
+        _sinkId = data['sink_id'] as String?;
+        if (_sinkId == null) {
+          onLog('Registration error: sink_id missing in response');
+          return;
+        }
+        onLog('Registered. SinkID: $_sinkId');
+        onSinkRegistered(_sinkId!);
+        _openWebSocket();
+      } else {
+        onLog('Registration failed (${res.statusCode}): ${res.body}');
+        _scheduleReconnect();
+      }
+    } catch (e) {
+      onLog('Registration error: $e');
+      _scheduleReconnect();
+    }
+  }
+
+  // ── WebSocket ─────────────────────────────────────────────────────────────
+
+  void _openWebSocket() {
+    if (_sinkId == null) return;
+
+    final wsBase = serverUrl.replaceFirst(RegExp(r'^http'), 'ws');
+    final uri = Uri.parse('$wsBase/api/v1/sinks/ws?sinkId=$_sinkId');
+    onLog('Opening WebSocket: $uri');
+
+    _channel = WebSocketChannel.connect(uri);
+    isConnected = true;
+    _retryDelaySecs = 2; // reset backoff on success
+
+    _channel!.stream.listen(
+      _handleMessage,
+      onDone: _handleDisconnect,
+      onError: (e) {
+        onLog('WebSocket error: $e');
+        _handleDisconnect();
+      },
+      cancelOnError: true,
+    );
+
+    _startHeartbeat();
+  }
+
+  void _handleDisconnect() {
+    isConnected = false;
+    _heartbeatTimer?.cancel();
+    if (_intentionalDisconnect) return;
+    onLog('WebSocket disconnected. Reconnecting...');
+    onDisconnected();
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    if (_intentionalDisconnect) return;
+    onLog('Retrying in ${_retryDelaySecs}s...');
+    Future.delayed(Duration(seconds: _retryDelaySecs), _register);
+    _retryDelaySecs = (_retryDelaySecs * 2).clamp(2, 60);
+  }
+
+  // ── Heartbeat ─────────────────────────────────────────────────────────────
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _sendHeartbeat(); // immediate on connect
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) => _sendHeartbeat());
   }
 
   void _sendHeartbeat() {
     if (!isConnected) return;
-    final msg = {
+    _channel!.sink.add(jsonEncode({
       'type': 'heartbeat',
       'payload': {
-        'sink_id': sinkId,
+        'sink_id': _sinkId,
         'ram_available_mb': 2048,
         'storage_available_mb': 10240,
-      }
-    };
-    _channel!.sink.add(jsonEncode(msg));
+      },
+    }));
   }
 
-  Future<void> _handleMessage(dynamic message) async {
+  // ── Message Handling ──────────────────────────────────────────────────────
+
+  Future<void> _handleMessage(dynamic raw) async {
     try {
-      final msg = jsonDecode(message);
-      if (msg['type'] == 'task_assignment') {
-        final payload = msg['payload'];
-        final executionId = payload['execution_id'];
-        final lambdaId = payload['lambda_id']; // Using Lambda ID to fetch the WASM
-        final input = payload['input'];
+      final msg = jsonDecode(raw as String) as Map<String, dynamic>;
+      if (msg['type'] != 'task_assignment') return;
 
-        onLog("Received Task $executionId! LambdaID: $lambdaId");
+      final p = msg['payload'] as Map<String, dynamic>;
+      final executionId = p['execution_id'] as String;
+      final lambdaId = p['lambda_id'] as String;
+      final rawInput = p['input'] as Map<String, dynamic>?;
 
-        // 1. Download WASM from Central Server
-        // Make sure lambdaId is sent in payload to fetch binary correctly
-        final wasmBytes = await _downloadFile('$serverUrl/api/v1/lambdas/$lambdaId/wasm');
-        if (wasmBytes == null) {
-          _sendResult(executionId, false, error: "Failed to download WASM");
-          return;
-        }
+      onLog('Received task $executionId (lambda: $lambdaId)');
 
-        // 2. Prepare payload (convert input to bytes depending on WASM expectations)
-        // For simplicity, converting stringified JSON input to bytes, or if it's base64 data, decode it.
-        Uint8List taskPayload;
-        if (input != null && input['data'] != null) {
-           taskPayload = base64Decode(input['data']);
-        } else {
-           taskPayload = Uint8List.fromList(utf8.encode(jsonEncode(input)));
-        }
-
-        onLog("Executing WASM...");
-        
-        // 3. Invoke WASM via Platform Channel
-        final dynamic result = await platform.invokeMethod('invokeDataWasm', {
-          'bytes': wasmBytes,
-          'funcName': 'invoke', // Default generic entrypoint
-          'payload': taskPayload,
-        });
-
-        // 4. Send Result
-        if (result is Uint8List) {
-          // Send back as base64 string
-          final b64Result = base64Encode(result);
-          _sendResult(executionId, true, output: {'data': b64Result});
-        } else {
-          _sendResult(executionId, true, output: {'result': result.toString()});
-        }
-
+      // 1. Download WASM binary
+      final wasmBytes = await _downloadWasm(lambdaId);
+      if (wasmBytes == null) {
+        sendResult(executionId, success: false, error: 'Failed to download WASM');
+        return;
       }
+
+      // 2. Decode typed input
+      final payload = _decodeTaskInput(rawInput);
+
+      // 3. Delegate execution to NodeController
+      await onTaskReceived(
+        executionId: executionId,
+        lambdaId: lambdaId,
+        wasmBytes: wasmBytes,
+        payload: payload,
+      );
     } catch (e) {
-      onLog("Error handling message: $e");
+      onLog('Message handling error: $e');
     }
   }
 
-  Future<Uint8List?> _downloadFile(String url) async {
+  Future<Uint8List?> _downloadWasm(String lambdaId) async {
     try {
-      // Handle local test urls mapping to host
-      String fetchUrl = url;
-      if (fetchUrl.contains('localhost') && Platform.isAndroid) {
-         fetchUrl = fetchUrl.replaceAll('localhost', '10.0.2.2');
+      String url = '$serverUrl/api/v1/lambdas/$lambdaId/wasm';
+      if (Platform.isAndroid) {
+        url = url.replaceAll('localhost', '10.0.2.2');
       }
-      final response = await http.get(Uri.parse(fetchUrl));
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
-      }
-      onLog("Failed to download: ${response.statusCode}");
+      final res = await http.get(
+        Uri.parse(url),
+        headers: {if (authToken.isNotEmpty) 'Authorization': 'Bearer $authToken'},
+      );
+      if (res.statusCode == 200) return res.bodyBytes;
+      onLog('WASM download failed (${res.statusCode})');
     } catch (e) {
-      onLog("Download error: $e");
+      onLog('WASM download error: $e');
     }
     return null;
   }
 
-  void _sendResult(String executionId, bool success, {dynamic output, String? error}) {
-    if (!isConnected) return;
-    
-    final payload = {
-      'execution_id': executionId,
-      'success': success,
-      'output': output,
-      'error': error,
-    };
+  // ── Result Reporting ──────────────────────────────────────────────────────
 
-    final msg = {
+  void sendResult(String executionId, {required bool success, dynamic output, String? error}) {
+    if (!isConnected) {
+      onLog('Cannot send result: not connected');
+      return;
+    }
+
+    dynamic serializedOutput;
+    if (output is Uint8List) {
+      serializedOutput = {'data': base64Encode(output)};
+    } else if (output != null) {
+      serializedOutput = {'result': output.toString()};
+    }
+
+    _channel!.sink.add(jsonEncode({
       'type': 'task_result',
-      'payload': payload
-    };
+      'payload': {
+        'execution_id': executionId,
+        'success': success,
+        if (serializedOutput != null) 'output': serializedOutput,
+        if (error != null) 'error': error,
+      },
+    }));
 
-    _channel!.sink.add(jsonEncode(msg));
-    onLog("Sent result for $executionId. Success: $success");
-    
-    // Send heartbeat to indicate ready
-    _sendHeartbeat();
+    _sendHeartbeat(); // signal ready for next task
   }
 }

@@ -5,11 +5,11 @@ import { formatDistanceToNow } from "date-fns";
 import { AppLayout } from "@/components/layout";
 import { StatusBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useFunction, useInvokeFunction, useLogs, useDeleteFunction, useExecution } from "@/hooks/useQueries";
 import { useToast } from "@/hooks/use-toast";
+import { InvokeModal } from "@/components/InvokeModal";
 
 // Safe date formatter that handles invalid dates
 function formatSafeTimestamp(timestamp?: string): string {
@@ -31,11 +31,7 @@ export default function FunctionDetail() {
   const initialTab = searchParams.get("tab") || "overview";
 
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [testInput, setTestInput] = useState(`{
-  "amount": 99.00,
-  "currency": "INR",
-  "method": "card"
-}`);
+  const [showInvokeModal, setShowInvokeModal] = useState(false);
   const [testOutput, setTestOutput] = useState("");
   const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
 
@@ -66,16 +62,16 @@ export default function FunctionDetail() {
   // Fetch logs related to this function (filtering by name for mock purposes)
   const { data: logs = [] } = useLogs({ q: functionData?.name });
 
-  const handleInvoke = async () => {
+  const handleInvoke = async (inputPayload: string) => {
     if (!id || !functionData) return;
     setTestOutput("");
     setCurrentExecutionId(null);
     try {
-      const result = await invokeFunction.mutateAsync({ id, input: testInput });
+      const result = await invokeFunction.mutateAsync({ id, input: inputPayload });
       if (result.acknowledged && result.execution_id) {
          setCurrentExecutionId(result.execution_id);
-         setTestOutput("Task submitted to server. Waiting for mobile node...");
-      } else if (result.execution_id) { // Fallback incase response maps differently
+         setTestOutput("Task dispatched to mobile node. Waiting for result...");
+      } else if (result.execution_id) {
          setCurrentExecutionId(result.execution_id);
       } else {
          setTestOutput(JSON.stringify(result, null, 2));
@@ -158,6 +154,14 @@ export default function FunctionDetail() {
           <Button variant="secondary" size="sm">
             <Download className="h-3.5 w-3.5 mr-2" />
             Export
+          </Button>
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => setShowInvokeModal(true)}
+          >
+            <Play className="h-3.5 w-3.5 mr-2" />
+            Invoke
           </Button>
           <Button variant="destructive" size="sm" onClick={handleDelete}>
             <Trash2 className="h-3.5 w-3.5 mr-2" />
@@ -276,53 +280,53 @@ export default function FunctionDetail() {
 
         {/* Invoke Tab */}
         <TabsContent value="invoke" className="mt-6">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Input (JSON)</h3>
-                <Button
-                  onClick={handleInvoke}
-                  disabled={invokeFunction.isPending}
-                  size="sm"
-                >
-                  {invokeFunction.isPending ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-2" />}
-                  {invokeFunction.isPending ? "Running..." : "Run"}
-                </Button>
+          <div className="flex flex-col items-center justify-center py-16 gap-6 border border-dashed border-border rounded-xl bg-surface/50">
+            <div className="text-center">
+              <div className="w-14 h-14 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center justify-center mx-auto mb-4">
+                <Play className="h-6 w-6 text-blue-400" />
               </div>
-              <Textarea
-                value={testInput}
-                onChange={(e) => setTestInput(e.target.value)}
-                className="font-mono text-sm h-64 bg-terminal resize-none"
-                placeholder='{"key": "value"}'
-              />
+              <h3 className="text-base font-semibold">Run on a Mobile Node</h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                Click <strong>Invoke</strong> to provide inputs and dispatch this function
+                to a connected Android WASM node for execution.
+              </p>
             </div>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium">Output</h3>
-              <div className="bg-terminal border border-border rounded-md h-64 overflow-auto relative">
-                {testOutput ? (
-                  <pre className="p-4 text-sm font-mono text-foreground whitespace-pre-wrap">{testOutput}</pre>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                    {invokeFunction.isPending || currentExecutionId ? "Executing..." : "Run the function to see output"}
+            <Button
+              id="invoke-button"
+              onClick={() => setShowInvokeModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+            >
+              <Play className="h-3.5 w-3.5 mr-2" />
+              Invoke Function
+            </Button>
+            {/* Output area */}
+            {testOutput && (
+              <div className="w-full max-w-2xl">
+                <div className="bg-terminal border border-border rounded-md">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                    <span className="text-xs text-muted-foreground">Execution Output</span>
+                    {executionResult?.output?.data && (
+                      <Button size="sm" variant="secondary" className="h-6 text-xs" onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = `data:application/octet-stream;base64,${executionResult.output.data}`;
+                        link.download = "result.bin";
+                        link.click();
+                      }}>
+                        <Download className="h-3 w-3 mr-1" /> Download
+                      </Button>
+                    )}
                   </div>
-                )}
-                
-                {/* Visualizer for Binary results (like base64 PDFs/Images) */}
-                {executionResult?.status === "completed" && executionResult?.output?.data && (
-                   <div className="absolute top-2 right-2 flex gap-2">
-                       <Button size="sm" variant="secondary" onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = `data:application/octet-stream;base64,${executionResult.output.data}`;
-                          link.download = "result.bin"; // Ideally determine type from output metadata
-                          link.click();
-                       }}>
-                           <Download className="h-3 w-3 mr-1" /> Download
-                       </Button>
-                   </div>
-                )}
+                  <pre className="p-4 text-sm font-mono text-foreground whitespace-pre-wrap overflow-auto max-h-64">
+                    {testOutput}
+                  </pre>
+                </div>
               </div>
-            </div>
+            )}
+            {(invokeFunction.isPending || currentExecutionId) && !testOutput && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Waiting for mobile node...
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -358,6 +362,16 @@ export default function FunctionDetail() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <InvokeModal
+        open={showInvokeModal}
+        onClose={() => setShowInvokeModal(false)}
+        functionName={functionData.name}
+        runtime={functionData.runtime}
+        sourceCode={displayCode}
+        onInvoke={handleInvoke}
+        isLoading={invokeFunction.isPending}
+      />
     </AppLayout>
   );
 }

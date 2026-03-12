@@ -136,12 +136,12 @@ Java_com_example_consumeronlywamr_WasmService_runWasm(JNIEnv *env,
   // sections to map functions to entry points.
 
   wasm_function_inst_t func =
-      wasm_runtime_lookup_function(module_inst, "app_main");
+      wasm_runtime_lookup_function(module_inst, "main");
   if (!func) {
-    func = wasm_runtime_lookup_function(module_inst, "_start");
+    func = wasm_runtime_lookup_function(module_inst, "app_main");
   }
   if (!func) {
-    func = wasm_runtime_lookup_function(module_inst, "main");
+    func = wasm_runtime_lookup_function(module_inst, "_start");
   }
   if (!func) {
     func = wasm_runtime_lookup_function(module_inst, "add");
@@ -365,6 +365,13 @@ Java_com_example_consumeronlywamr_WasmService_invokeWasm(JNIEnv *env, jobject,
   {
     wasm_function_inst_t func =
         wasm_runtime_lookup_function(module_inst, nativeFuncName);
+    // Fallbacks if the requested function name isn't found
+    if (!func && strcmp(nativeFuncName, "main") != 0) {
+        func = wasm_runtime_lookup_function(module_inst, "main");
+    }
+    if (!func) {
+        func = wasm_runtime_lookup_function(module_inst, "app_main");
+    }
     if (func) {
       // Create argv buffer. WAMR needs space for both args and result.
       // Since we expect 1 result, we need max(argCount, 1).
@@ -459,8 +466,11 @@ Java_com_example_consumeronlywamr_WasmService_invokeDataWasmNative(
   {
     wasm_function_inst_t func =
         wasm_runtime_lookup_function(module_inst, nativeFuncName);
-    if (!func) {
+    if (!func && strcmp(nativeFuncName, "main") != 0) {
       func = wasm_runtime_lookup_function(module_inst, "main");
+    }
+    if (!func) {
+      func = wasm_runtime_lookup_function(module_inst, "app_main");
     }
     if (!func) {
       func = wasm_runtime_lookup_function(module_inst, "_start");

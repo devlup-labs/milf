@@ -46,7 +46,15 @@ export default function CreateFunction() {
   const [formData, setFormData] = useState({
     name: "",
     sourceType: "inline",
-    code: `#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}\n`,
+    code: `#include <stdint.h>
+
+// Export the function — this is what the WASM runtime will call.
+// Parameters become the user-provided inputs at invocation time.
+__attribute__((visibility("default"))) __attribute__((used))
+int main(int a, int b) {
+  return a + b;
+}
+`,
     runtime: "c",
     memory: 128,
     timeout: 30,
@@ -214,6 +222,7 @@ export default function CreateFunction() {
   const estimatedCost = ((formData.memory / 1024) * (formData.timeout / 1000) * 0.0000166667).toFixed(6);
 
   const getEditorLanguage = () => {
+    if (formData.runtime === "c" || formData.runtime === "cpp") return "c";
     if (formData.runtime.startsWith("go")) return "go";
     if (formData.runtime.startsWith("node")) return "javascript";
     if (formData.runtime.startsWith("python")) return "python";

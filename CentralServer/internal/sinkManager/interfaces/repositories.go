@@ -26,3 +26,8 @@ type TaskResultRepository interface {
 	Save(ctx context.Context, result *domain.TaskResult) error
 	FindByExecutionID(ctx context.Context, executionID string) (*domain.TaskResult, error)
 }
+
+// FunctionRepository lets the sink manager fetch WASM bytes for a function.
+type FunctionRepository interface {
+	FindByID(ctx context.Context, id string) (wasmBytes []byte, err error)
+}

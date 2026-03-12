@@ -17,12 +17,13 @@ type Job struct {
 	JobID        string
 	FuncID       string
 	Status       JobStatus
+	InputPayload string
 	MetaData   	 map[string]string `json:"metadata"`
 	CyclesWaited int
 }
 
 
-func NewJob(jobID, funcID string, metaData map[string]string) (*Job, error) {
+func NewJob(jobID, funcID string, inputPayload string, metaData map[string]string) (*Job, error) {
 	if jobID == "" {
 		return nil, errors.New("jobID cannot be empty")
 	}
@@ -34,6 +35,7 @@ func NewJob(jobID, funcID string, metaData map[string]string) (*Job, error) {
 		JobID:  jobID,
 		FuncID: funcID,
 		Status: JobNew,
+		InputPayload: inputPayload,
 		MetaData: metaData,
 		CyclesWaited: 0,
 	}, nil

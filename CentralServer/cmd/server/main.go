@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	gwhandler "central_server/internal/gateway/handler" // gwinterfaces alias in original, reusing
 	gwinterfaces "central_server/internal/gateway/interfaces"
 	orchcore "central_server/internal/orchestrator/core"
+	policy "central_server/internal/policy"
 	navqueue "central_server/internal/queueService/core"
 	sinkcore "central_server/internal/sinkManager/core"
 	sinkhandler "central_server/internal/sinkManager/handler"
@@ -71,8 +73,11 @@ func main() {
 		jwtSecret = "dev-secret"
 	}
 	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
-	
-	authService := authcore.NewAuthService(userRepo, jwtSecret, googleClientID)
+
+	// Policy Manager (billing + quota enforcement)
+	policyMgr := policy.NewManager(userRepo.GetDB())
+
+	authService := authcore.NewAuthService(userRepo, jwtSecret, googleClientID, policyMgr)
 	authHandler := authhandler.NewAuthHandler(authService)
 
 	// --- FUNCTION / COMPILER / ORCHESTRATOR WIRING ---
@@ -113,10 +118,33 @@ func main() {
 
 	// QueueService - already created above
 
-	sinkService := sinkcore.NewSinkManagerService(sinkRepo, taskRepo, resultRepo, sinkClient, queueService, nil, "dev-secret")
+	// ResultCallback: when Android returns a result, update the executionRepo
+	// so the frontend's polling GET /api/v1/executions/{id} sees the final status.
+	resultCallback := func(ctx context.Context, executionID string, result interface{}, execErr error) {
+		if execErr != nil {
+			log.Printf("[WorkManager] ✗ Execution %s FAILED on worker: %v", executionID, execErr)
+			_ = executionRepo.UpdateStatus(ctx, executionID, domain.ExecutionStatusFailed, nil, execErr.Error())
+		} else {
+			log.Printf("[WorkManager] ✔ Execution %s COMPLETED — output: %v", executionID, result)
+			_ = executionRepo.UpdateStatus(ctx, executionID, domain.ExecutionStatusCompleted, result, "")
+		}
+	}
+
+	sinkService := sinkcore.NewSinkManagerService(sinkRepo, taskRepo, resultRepo, sinkClient, queueService, resultCallback, jwtSecret)
 
 	// Break circular dependency
 	queueService.SetSinkManager(sinkService)
+
+	// Wire WASM fetcher: lets the WorkManager inline compiled WASM bytes
+	// into the task payload so Android can execute without a separate download.
+	sinkService.SetWasmFetcher(func(ctx context.Context, lambdaID string) ([]byte, error) {
+		lambda, err := functionRepo.FindByID(ctx, lambdaID)
+		if err != nil {
+			return nil, err
+		}
+		return []byte(lambda.WasmRef), nil
+	})
+
 	sinkHandler := sinkhandler.NewSinkHandler(sinkService)
 	sinkRouter := sinkinterfaces.NewRouter(sinkHandler, authHandler.AuthMiddleware)
 
@@ -140,6 +168,18 @@ func main() {
 	mux.HandleFunc("/api/v1/auth/register", authHandler.Register)
 	mux.HandleFunc("/api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("/api/v1/auth/google", authHandler.GoogleLogin)
+
+	// Usage & billing endpoint (requires auth)
+	mux.Handle("/api/v1/users/me/usage", authHandler.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := r.Context().Value("user_id").(string)
+		report, err := policyMgr.GetUsage(r.Context(), userID)
+		if err != nil {
+			http.Error(w, "failed to get usage", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(report)
+	})))
 
 	// Mount gateway routes
 	gatewayMux := gatewayRouter.Setup()

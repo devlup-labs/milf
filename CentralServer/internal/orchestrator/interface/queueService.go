@@ -7,12 +7,14 @@ type QueueService interface {
 		ctx context.Context,
 		jobID string,
 		funcID string,
+		inputPayload string,
 		metaData map[string]string,
 	) (error, bool)
 	DispatchOrEnqueue(
 		ctx context.Context,
 		jobID string,
 		funcID string,
+		inputPayload string,
 		metaData map[string]string,
 	) (error, bool)
 }

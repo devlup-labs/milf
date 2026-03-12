@@ -37,14 +37,14 @@ func (s *QueueService) SetSinkManager(sm sinkDomain.SinkManagerService) {
 	s.sinkManager = sm
 }
 
-func (s *QueueService) Enqueue(ctx context.Context, jobID string, funcID string, metaData map[string]string) (error, bool) {
+func (s *QueueService) Enqueue(ctx context.Context, jobID string, funcID string, inputPayload string, metaData map[string]string) (error, bool) {
 	maxRam, err := strconv.Atoi(metaData["maxRam"])
 	if err != nil {
 		utils.Error("Failed to parse maxRam: " + err.Error())
 		return err, false
 	}
 
-	job, err := domain.NewJob(jobID, funcID, metaData)
+	job, err := domain.NewJob(jobID, funcID, inputPayload, metaData)
 	if err != nil {
 		utils.Error("Failed to create job: " + err.Error())
 		return err, false
@@ -115,7 +115,7 @@ func (s *QueueService) ClaimNextJob(allowedRam int) (*interfaces.CandidateJob, e
 	return &chosen, nil
 }
 
-func (s *QueueService) DispatchOrEnqueue(ctx context.Context, jobID string, funcID string, metaData map[string]string) (error, bool) {
+func (s *QueueService) DispatchOrEnqueue(ctx context.Context, jobID string, funcID string, inputPayload string, metaData map[string]string) (error, bool) {
 	sinkID, active := s.sinkManager.GetSinkForLambda(ctx, funcID)
 	if active {
 		utils.Info(fmt.Sprintf("Lambda %s is active in sink %s. Dispatching directly.", funcID, sinkID))
@@ -128,19 +128,22 @@ func (s *QueueService) DispatchOrEnqueue(ctx context.Context, jobID string, func
 			ExecutionID: jobID,
 			LambdaID:    funcID,
 			WasmRef:     metaData["wasmRef"],
-			Input:       input,
-			SinkID:      sinkID,
-			Status:      sinkDomain.TaskStatusPending,
-			CreatedAt:   time.Now().UTC(),
+			Input: map[string]interface{}{
+				"type": "json", // Default to JSON for triggers
+				"data": inputPayload,
+			},
+			SinkID:    sinkID,
+			Status:    sinkDomain.TaskStatusPending,
+			CreatedAt: time.Now().UTC(),
 		}
 
 		_, err := s.sinkManager.DeliverTask(ctx, task)
 		if err != nil {
 			utils.Error(fmt.Sprintf("Failed to deliver task to active sink %s: %v. Enqueuing instead.", sinkID, err))
 			// Fallback to enqueue
-			return s.Enqueue(ctx, jobID, funcID, metaData)
+			return s.Enqueue(ctx, jobID, funcID, inputPayload, metaData)
 		}
 		return nil, true
 	}
-	return s.Enqueue(ctx, jobID, funcID, metaData)
+	return s.Enqueue(ctx, jobID, funcID, inputPayload, metaData)
 }

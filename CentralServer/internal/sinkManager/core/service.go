@@ -4,6 +4,9 @@ import (
 	"central_server/internal/sinkManager/domain"
 	"central_server/internal/sinkManager/interfaces"
 	"context"
+	"encoding/base64"
+	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -19,6 +22,7 @@ type SinkManagerService struct {
 	sinkClient     interfaces.SinkClient
 	queueService   interfaces.QueueService
 	resultCallback domain.ResultCallback
+	wasmFetcher    func(ctx context.Context, lambdaID string) ([]byte, error) // optional
 	jwtSecret      []byte
 
 	staleCtx      context.Context
@@ -49,6 +53,12 @@ func NewSinkManagerService(
 		activeLambdas:  make(map[string]string),
 		wsConns:        make(map[string]interface{}),
 	}
+}
+
+// SetWasmFetcher wires a function to fetch compiled WASM bytes by lambda ID.
+// Call this after construction to break circular dependency.
+func (s *SinkManagerService) SetWasmFetcher(fn func(ctx context.Context, lambdaID string) ([]byte, error)) {
+	s.wasmFetcher = fn
 }
 
 func (s *SinkManagerService) RegisterSink(ctx context.Context, req *domain.SinkRegisterRequest) (*domain.SinkRegisterResponse, error) {
@@ -170,6 +180,7 @@ func (s *SinkManagerService) ProcessHeartbeat(ctx context.Context, req *domain.H
 		return nil, domain.ErrSinkNotFound
 	}
 
+	prevStatus := sink.Status
 	sink.RAMAvailableMB = req.RAMAvailableMB
 	sink.StorageAvailableMB = req.StorageAvailableMB
 	sink.Status = domain.SinkStatusOnline
@@ -177,6 +188,11 @@ func (s *SinkManagerService) ProcessHeartbeat(ctx context.Context, req *domain.H
 
 	if err := s.sinkRepo.Update(ctx, sink); err != nil {
 		return nil, domain.ErrInternalServer
+	}
+
+	if prevStatus == domain.SinkStatusOffline {
+		log.Printf("[WorkManager] 🟢 Worker %s came ONLINE (RAM: %dMB, Storage: %dMB)",
+			req.SinkID, req.RAMAvailableMB, req.StorageAvailableMB)
 	}
 
 	go s.tryDispatchToSink(context.Background(), sink)
@@ -198,6 +214,7 @@ func (s *SinkManagerService) DeliverTask(ctx context.Context, task *domain.Task)
 	}
 
 	if sink.Status == domain.SinkStatusOffline {
+		log.Printf("[WorkManager] ⚠  Sink %s is OFFLINE, cannot deliver task %s", sink.ID, task.ExecutionID)
 		return nil, domain.ErrSinkUnreachable
 	}
 
@@ -208,38 +225,71 @@ func (s *SinkManagerService) DeliverTask(ctx context.Context, task *domain.Task)
 		return nil, domain.ErrInternalServer
 	}
 
-	deliveryReq := &domain.TaskDeliveryRequest{
-		ExecutionID: task.ExecutionID,
-		WasmRef:     task.WasmRef,
-		Input:       task.Input,
-	}
-
-	resp, err := s.sinkClient.DeliverTask(ctx, sink, deliveryReq)
-	if err != nil {
-		task.Status = domain.TaskStatusFailed
-		_ = s.taskRepo.Update(ctx, task)
-		return nil, domain.ErrTaskDeliveryFailed
-	}
-
-	if resp.Accepted {
+	// Try WebSocket delivery first (preferred — direct real-time push)
+	_, wsConnected := s.wsConns[task.SinkID]
+	if wsConnected {
+		log.Printf("[WorkManager] ➤ Assigning job [exec=%s func=%s] to worker %s via WebSocket",
+			task.ExecutionID, task.LambdaID, sink.ID)
+		err := s.SendWebSocketMessage(task.SinkID, domain.MsgTaskAssignment, map[string]interface{}{
+			"execution_id": task.ExecutionID,
+			"func_id":      task.LambdaID,
+			"wasm_url":     fmt.Sprintf("/api/v1/lambdas/%s/wasm", task.LambdaID),
+			"input":        task.Input,
+		})
+		if err != nil {
+			log.Printf("[WorkManager] ⚠  WS delivery failed for %s: %v — falling back to HTTP", task.ExecutionID, err)
+			goto httpFallback
+		}
 		now := time.Now().UTC()
 		task.Status = domain.TaskStatusDelivered
 		task.DeliveredAt = &now
 		_ = s.taskRepo.Update(ctx, task)
-
 		sink.Status = domain.SinkStatusBusy
 		_ = s.sinkRepo.Update(ctx, sink)
-
 		s.mu.Lock()
 		s.activeLambdas[task.LambdaID] = sink.ID
 		s.mu.Unlock()
-	} else {
-		task.Status = domain.TaskStatusFailed
-		_ = s.taskRepo.Update(ctx, task)
-		return nil, domain.ErrTaskDeliveryFailed
+		return &domain.TaskDeliveryResponse{ExecutionID: task.ExecutionID, Accepted: true, Message: "Delivered via WebSocket"}, nil
 	}
 
-	return resp, nil
+httpFallback:
+	// HTTP delivery via sinkClient
+	{
+		deliveryReq := &domain.TaskDeliveryRequest{
+			ExecutionID: task.ExecutionID,
+			WasmRef:     task.WasmRef,
+			Input:       task.Input,
+		}
+
+		resp, err := s.sinkClient.DeliverTask(ctx, sink, deliveryReq)
+		if err != nil {
+			log.Printf("[WorkManager] ✗ HTTP delivery failed for exec %s to sink %s: %v",
+				task.ExecutionID, sink.ID, err)
+			task.Status = domain.TaskStatusFailed
+			_ = s.taskRepo.Update(ctx, task)
+			return nil, domain.ErrTaskDeliveryFailed
+		}
+
+		if resp.Accepted {
+			log.Printf("[WorkManager] ➤ Job [exec=%s func=%s] accepted by worker %s (HTTP)",
+				task.ExecutionID, task.LambdaID, sink.ID)
+			now := time.Now().UTC()
+			task.Status = domain.TaskStatusDelivered
+			task.DeliveredAt = &now
+			_ = s.taskRepo.Update(ctx, task)
+			sink.Status = domain.SinkStatusBusy
+			_ = s.sinkRepo.Update(ctx, sink)
+			s.mu.Lock()
+			s.activeLambdas[task.LambdaID] = sink.ID
+			s.mu.Unlock()
+		} else {
+			log.Printf("[WorkManager] ✗ Sink %s rejected task %s", sink.ID, task.ExecutionID)
+			task.Status = domain.TaskStatusFailed
+			_ = s.taskRepo.Update(ctx, task)
+			return nil, domain.ErrTaskDeliveryFailed
+		}
+		return resp, nil
+	}
 }
 
 func (s *SinkManagerService) ProcessTaskResult(ctx context.Context, req *domain.TaskResultRequest) (*domain.TaskResultResponse, error) {
@@ -255,14 +305,17 @@ func (s *SinkManagerService) ProcessTaskResult(ctx context.Context, req *domain.
 	now := time.Now().UTC()
 	if req.Success {
 		task.Status = domain.TaskStatusCompleted
+		log.Printf("[WorkManager] ✔ Worker %s completed exec=%s output=%v",
+			task.SinkID, req.ExecutionID, req.Output)
 	} else {
 		task.Status = domain.TaskStatusFailed
+		log.Printf("[WorkManager] ✗ Worker %s FAILED exec=%s error=%q",
+			task.SinkID, req.ExecutionID, req.Error)
 	}
 	task.CompletedAt = &now
 
 	_ = s.taskRepo.Update(ctx, task)
 
-	// Save result
 	result := &domain.TaskResult{
 		ExecutionID: req.ExecutionID,
 		Output:      req.Output,
@@ -279,6 +332,7 @@ func (s *SinkManagerService) ProcessTaskResult(ctx context.Context, req *domain.
 		if sink, err := s.sinkRepo.FindByID(ctx, task.SinkID); err == nil {
 			sink.Status = domain.SinkStatusOnline
 			_ = s.sinkRepo.Update(ctx, sink)
+			log.Printf("[WorkManager] 🟢 Worker %s back ONLINE, checking queue", task.SinkID)
 			go s.tryDispatchToSink(context.Background(), sink)
 		}
 	}
@@ -286,7 +340,7 @@ func (s *SinkManagerService) ProcessTaskResult(ctx context.Context, req *domain.
 	if s.resultCallback != nil {
 		var resultErr error
 		if !req.Success && req.Error != "" {
-			resultErr = domain.ErrResultNotFound
+			resultErr = fmt.Errorf("%s", req.Error)
 		}
 		go s.resultCallback(context.Background(), req.ExecutionID, req.Output, resultErr)
 	}
@@ -316,25 +370,48 @@ func (s *SinkManagerService) tryDispatchToSink(ctx context.Context, sink *domain
 
 	candidate, err := s.queueService.ClaimNextJob(sink.RAMAvailableMB)
 	if err != nil || candidate == nil {
+		// No pending jobs — nothing to do
 		return
 	}
 
-	input := make(map[string]interface{})
-	for k, v := range candidate.Job.MetaData {
-		input[k] = v
+	log.Printf("[WorkManager] 📦 Claimed job [func=%s exec=%s] from queue for worker %s",
+		candidate.Job.FuncID, candidate.Job.JobID, sink.ID)
+
+	// Build input envelope
+	inputPayload := candidate.Job.InputPayload
+	if inputPayload == "" {
+		inputPayload = `{"type":"null"}`
 	}
 
 	task := &domain.Task{
 		ExecutionID: candidate.Job.JobID,
 		LambdaID:    candidate.Job.FuncID,
-		WasmRef:     candidate.Job.MetaData["wasmRef"],
-		Input:       input,
-		SinkID:      sink.ID,
-		Status:      domain.TaskStatusPending,
-		CreatedAt:   time.Now().UTC(),
+		WasmRef:     "", // populated below if wasmFetcher is set
+		Input: map[string]interface{}{
+			"type": "json",
+			"data": inputPayload,
+		},
+		SinkID:    sink.ID,
+		Status:    domain.TaskStatusPending,
+		CreatedAt: time.Now().UTC(),
 	}
 
-	_, _ = s.DeliverTask(ctx, task)
+	// Try to inline WASM bytes as base64 if fetcher is wired
+	if s.wasmFetcher != nil {
+		if wasmBytes, err := s.wasmFetcher(ctx, candidate.Job.FuncID); err == nil && len(wasmBytes) > 0 {
+			task.WasmRef = base64.StdEncoding.EncodeToString(wasmBytes)
+			log.Printf("[WorkManager] 💾 Inlined %d WASM bytes for func=%s",
+				len(wasmBytes), candidate.Job.FuncID)
+		} else {
+			log.Printf("[WorkManager] ⚠  Could not fetch WASM for func=%s: %v", candidate.Job.FuncID, err)
+		}
+	}
+
+	_, err = s.DeliverTask(ctx, task)
+	if err != nil {
+		log.Printf("[WorkManager] ✗ Failed to deliver job [exec=%s] to worker %s: %v",
+			task.ExecutionID, sink.ID, err)
+	}
 }
 
 func (s *SinkManagerService) StartStaleDetector(ctx context.Context, staleThreshold time.Duration) {

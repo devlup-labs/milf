@@ -13,18 +13,32 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useFunctions, useDeleteFunction } from "@/hooks/useQueries";
+import { useFunctions, useDeleteFunction, useInvokeFunction } from "@/hooks/useQueries";
 import { FunctionEntity } from "@/lib/mock/types";
+import { InvokeModal } from "@/components/InvokeModal";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Functions() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedInvoke, setSelectedInvoke] = useState<FunctionEntity | null>(null);
   const { data: functions = [], isLoading, error } = useFunctions(searchQuery);
   const deleteFunction = useDeleteFunction();
+  const invokeFunction = useInvokeFunction();
 
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to delete this function?")) {
       deleteFunction.mutate(id);
+    }
+  };
+
+  const handleInvokeSubmit = async (fn: FunctionEntity, payload: string) => {
+    try {
+      const result = await invokeFunction.mutateAsync({ id: fn.id, input: payload });
+      toast({ title: "Function invoked", description: `Execution ID: ${result.execution_id ?? "dispatched"}` });
+    } catch (e) {
+      toast({ title: "Invocation failed", description: (e as Error).message, variant: "destructive" });
     }
   };
 
@@ -116,7 +130,7 @@ export default function Functions() {
               <ExternalLink className="h-3.5 w-3.5 mr-2" />
               View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate(`/functions/${fn.id}?tab=invoke`)}>
+            <DropdownMenuItem onClick={() => setSelectedInvoke(fn)}>
               <Play className="h-3.5 w-3.5 mr-2" />
               Invoke
             </DropdownMenuItem>
@@ -190,6 +204,18 @@ export default function Functions() {
           />
         )}
       </div>
+
+      {selectedInvoke && (
+        <InvokeModal
+          open={!!selectedInvoke}
+          onClose={() => setSelectedInvoke(null)}
+          functionName={selectedInvoke.name}
+          runtime={selectedInvoke.runtime}
+          sourceCode={selectedInvoke.source.type === "inline" ? selectedInvoke.source.code : ""}
+          onInvoke={(payload) => handleInvokeSubmit(selectedInvoke, payload)}
+          isLoading={invokeFunction.isPending}
+        />
+      )}
     </AppLayout>
   );
 }

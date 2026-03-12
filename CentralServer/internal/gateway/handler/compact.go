@@ -22,10 +22,10 @@ func NewCompatHandler(svc domain.LambdaService) *CompatHandler {
 
 // This matches mockApi.functions.invoke()
 func (h *CompatHandler) Invoke(w http.ResponseWriter, r *http.Request) {
-	// What the client sends
+	// What the client sends — input is already a TaskEnvelope: {type, data}
 	var req struct {
-		ID    string                 `json:"id"`
-		Input map[string]interface{} `json:"input"`
+		ID    string      `json:"id"`
+		Input interface{} `json:"input"` // accepts string OR object
 	}
 
 	// Read JSON
@@ -34,12 +34,26 @@ func (h *CompatHandler) Invoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalise input: client may send parsed JSON object or a string
+	var inputMap map[string]interface{}
+	switch v := req.Input.(type) {
+	case map[string]interface{}:
+		inputMap = v
+	case string:
+		// Try to unwrap JSON-string → map
+		if err := json.Unmarshal([]byte(v), &inputMap); err != nil {
+			inputMap = map[string]interface{}{"type": "json", "data": v}
+		}
+	default:
+		inputMap = map[string]interface{}{"type": "null"}
+	}
+
 	// Call existing Gateway logic
 	resp, err := h.lambdaService.TriggerLambda(
 		r.Context(),
 		&domain.LambdaExecRequest{
 			ReferenceID: req.ID,
-			Input:       req.Input,
+			Input:       inputMap,
 		},
 	)
 	if err != nil {
@@ -47,10 +61,13 @@ func (h *CompatHandler) Invoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return what the old client expects
+	w.Header().Set("Content-Type", "application/json")
+	// Return execution_id so the frontend can poll for the result
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"ok":        true,
-		"requestId": resp.ExecutionID,
+		"ok":           true,
+		"execution_id": resp.ExecutionID,
+		"acknowledged":  resp.ExecutionID != "",
+		"status":       string(resp.Status),
 	})
 }
 

@@ -58,3 +58,28 @@ CREATE TABLE IF NOT EXISTS logs (
 
 CREATE INDEX IF NOT EXISTS idx_logs_request_id ON logs(request_id);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
+
+-- Per-user execution and compute policies
+CREATE TABLE IF NOT EXISTS policies (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    max_executions_per_day INT NOT NULL DEFAULT 100,
+    max_compute_mb_per_cycle INT NOT NULL DEFAULT 10240,
+    allowed_runtimes TEXT[] NOT NULL DEFAULT ARRAY['c'],
+    max_concurrent_tasks INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id)
+);
+
+-- Rolling billing cycle usage (reset each cycle_start date)
+CREATE TABLE IF NOT EXISTS billing_usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    cycle_start DATE NOT NULL,
+    executions_count INT NOT NULL DEFAULT 0,
+    compute_mb_used INT NOT NULL DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, cycle_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_billing_usage_user_id ON billing_usage(user_id);
