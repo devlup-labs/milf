@@ -19,6 +19,24 @@ class ExecutionRecord {
   }) : timestamp = DateTime.now();
 }
 
+/// Tracks an incoming WASM dispatch event for the WASM Info tab.
+class WasmEvent {
+  final String executionId;
+  final String lambdaId;
+  final int wasmSizeBytes;
+  final int payloadSizeBytes;
+  final String payloadType;
+  final DateTime timestamp;
+
+  WasmEvent({
+    required this.executionId,
+    required this.lambdaId,
+    required this.wasmSizeBytes,
+    required this.payloadSizeBytes,
+    required this.payloadType,
+  }) : timestamp = DateTime.now();
+}
+
 /// The single source of truth for all app state.
 /// The UI only observes this — it never has direct logic.
 enum NodeStatus { idle, connecting, online, executing, error }
@@ -37,6 +55,7 @@ class NodeController extends ChangeNotifier {
   int executionSuccess = 0;
   int executionFailed = 0;
   List<ExecutionRecord> history = [];
+  List<WasmEvent> wasmEvents = [];
 
   // ── Internal ──────────────────────────────────────────────────────────────
   CloudSync? _sync;
@@ -109,6 +128,17 @@ class NodeController extends ChangeNotifier {
   }) async {
     _setStatus(NodeStatus.executing);
     _log('Executing task $executionId (lambda: $lambdaId)...');
+
+    // Record incoming WASM event for the WASM Info tab
+    final payloadType = payload.isEmpty ? 'null' : 'binary';
+    wasmEvents.insert(0, WasmEvent(
+      executionId: executionId,
+      lambdaId: lambdaId,
+      wasmSizeBytes: wasmBytes.length,
+      payloadSizeBytes: payload.length,
+      payloadType: payloadType,
+    ));
+    notifyListeners();
 
     try {
       final dynamic result = await _platform

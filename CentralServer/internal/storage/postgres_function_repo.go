@@ -4,6 +4,7 @@ import (
 	"central_server/internal/gateway/domain"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -61,6 +62,7 @@ func (r *PostgresFunctionRepo) FindByID(ctx context.Context, id string) (*domain
 
 	lambda := &domain.Lambda{}
 	var runtime, runType string
+	var wasmBytes []byte
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&lambda.ID,
@@ -69,7 +71,7 @@ func (r *PostgresFunctionRepo) FindByID(ctx context.Context, id string) (*domain
 		&runtime,
 		&lambda.MemoryMB,
 		&lambda.SourceCode,
-		&lambda.WasmRef,
+		&wasmBytes,
 		&runType,
 		&lambda.CreatedAt,
 		&lambda.UpdatedAt,
@@ -84,6 +86,9 @@ func (r *PostgresFunctionRepo) FindByID(ctx context.Context, id string) (*domain
 
 	lambda.Runtime = domain.RuntimeEnvironment(runtime)
 	lambda.RunType = domain.RunType(runType)
+	if len(wasmBytes) > 0 {
+		lambda.WasmRef = base64.StdEncoding.EncodeToString(wasmBytes)
+	}
 
 	return lambda, nil
 }
@@ -186,6 +191,7 @@ func (r *PostgresFunctionRepo) List(ctx context.Context, userID string) ([]*doma
 	for rows.Next() {
 		lambda := &domain.Lambda{}
 		var runtime, runType string
+		var wasmBytes []byte
 
 		err := rows.Scan(
 			&lambda.ID,
@@ -194,7 +200,7 @@ func (r *PostgresFunctionRepo) List(ctx context.Context, userID string) ([]*doma
 			&runtime,
 			&lambda.MemoryMB,
 			&lambda.SourceCode,
-			&lambda.WasmRef,
+			&wasmBytes,
 			&runType,
 			&lambda.CreatedAt,
 			&lambda.UpdatedAt,
@@ -205,6 +211,9 @@ func (r *PostgresFunctionRepo) List(ctx context.Context, userID string) ([]*doma
 
 		lambda.Runtime = domain.RuntimeEnvironment(runtime)
 		lambda.RunType = domain.RunType(runType)
+		if len(wasmBytes) > 0 {
+			lambda.WasmRef = base64.StdEncoding.EncodeToString(wasmBytes)
+		}
 		lambdas = append(lambdas, lambda)
 	}
 

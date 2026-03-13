@@ -38,10 +38,14 @@ func (s *QueueService) SetSinkManager(sm sinkDomain.SinkManagerService) {
 }
 
 func (s *QueueService) Enqueue(ctx context.Context, jobID string, funcID string, inputPayload string, metaData map[string]string) (error, bool) {
-	maxRam, err := strconv.Atoi(metaData["maxRam"])
+	maxRamStr, ok := metaData["maxRam"]
+	if !ok || maxRamStr == "" {
+		maxRamStr = "512" // Default to 512MB
+	}
+	maxRam, err := strconv.Atoi(maxRamStr)
 	if err != nil {
 		utils.Error("Failed to parse maxRam: " + err.Error())
-		return err, false
+		maxRam = 512
 	}
 
 	job, err := domain.NewJob(jobID, funcID, inputPayload, metaData)
@@ -70,6 +74,12 @@ func (s *QueueService) Enqueue(ctx context.Context, jobID string, funcID string,
 	s.mu.Lock()
 	s.jobIndex[jobID] = queue.QueueID
 	s.mu.Unlock()
+
+	// Notify idle workers that a job is available
+	if s.sinkManager != nil {
+		go s.sinkManager.NotifyNewJob(context.Background())
+	}
+
 	return nil, true
 }
 
@@ -78,8 +88,8 @@ func (s *QueueService) CandidateJobs(allowedRam int) []interfaces.CandidateJob {
 	defer s.mu.Unlock()
 	candidates := make([]interfaces.CandidateJob, 0)
 	for _, queue := range s.pool.All() {
-		if queue.ResourceRange.MinRam <= allowedRam &&
-			queue.ResourceRange.MaxRam >= allowedRam {
+		// A sink can handle ANY queue where the max required RAM is within its capacity.
+		if queue.ResourceRange.MaxRam <= allowedRam {
 
 			job, ok := queue.Peek()
 			if ok {

@@ -179,14 +179,30 @@ class CloudSync {
       final p = msg['payload'] as Map<String, dynamic>;
       final executionId = p['execution_id'] as String;
       final lambdaId = p['lambda_id'] as String;
-      final rawInput = p['input'] as Map<String, dynamic>?;
+      final rawInput = p['payload'] as Map<String, dynamic>?;
 
       onLog('Received task $executionId (lambda: $lambdaId)');
+      Uint8List? wasmBytes;
 
-      // 1. Download WASM binary
-      final wasmBytes = await _downloadWasm(lambdaId);
+      // 1. Try to use inlined WASM bytes first
+      final inlinedB64 = p['wasm_base64'] as String?;
+      if (inlinedB64 != null && inlinedB64.isNotEmpty) {
+        try {
+          wasmBytes = base64Decode(inlinedB64);
+          onLog('Using inlined WASM ($executionId)');
+        } catch (e) {
+          onLog('Failed to decode inlined WASM: $e');
+        }
+      }
+
+      // 2. Fallback: Download via HTTP if no inlined data or decoding failed
       if (wasmBytes == null) {
-        sendResult(executionId, success: false, error: 'Failed to download WASM');
+        onLog('Downloading WASM for $executionId...');
+        wasmBytes = await _downloadWasm(lambdaId);
+      }
+
+      if (wasmBytes == null) {
+        sendResult(executionId, success: false, error: 'Failed to acquire WASM binary');
         return;
       }
 

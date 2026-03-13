@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 
 	authdomain "central_server/internal/auth/domain"
 	"central_server/internal/gateway/domain"
@@ -156,6 +159,21 @@ func (h *LambdaHandler) GetWasm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// FALLBACK FOR LOCAL TESTING:
+	if lambdaID == "test-local-addd" {
+		log.Printf("[Handler] 📁 Reading local test file for lambdaID: %s", lambdaID)
+		wasmBytes, err := os.ReadFile("/Users/adarsh/Projects/devlup/milf/consumeronlywamr/test/addd.wasm")
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to read local WASM file", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "application/wasm")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.wasm\"", lambdaID))
+		w.WriteHeader(http.StatusOK)
+		w.Write(wasmBytes)
+		return
+	}
+
 	lambda, err := h.service.GetLambda(r.Context(), lambdaID)
 	if err != nil {
 		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
@@ -167,11 +185,17 @@ func (h *LambdaHandler) GetWasm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Serve raw wasm bytes directly for download by the target Android node
+	// WasmRef is stored as base64 (BYTEA read from Postgres) — decode to raw bytes.
+	wasmBytes, decErr := base64.StdEncoding.DecodeString(lambda.WasmRef)
+	if decErr != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to decode WASM binary", decErr.Error())
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/wasm")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.wasm\"", lambda.Name))
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(lambda.WasmRef))
+	w.Write(wasmBytes)
 }
 
 func (h *LambdaHandler) Execute(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -135,14 +136,36 @@ func main() {
 	// Break circular dependency
 	queueService.SetSinkManager(sinkService)
 
+	// Wire Recent Function Fetcher: Enables the testing mode where the most recent
+	// function is auto-dispatched to any node that heartbeats if the queue is empty.
+	/*
+	// Wire Recent Function Fetcher: Enables the testing mode where the most recent
+	// function is auto-dispatched to any node that heartbeats if the queue is empty.
+	sinkService.SetRecentFuncFetcher(func(ctx context.Context) (string, error) {
+		// FOR TESTING: return a special ID for the local addd.wasm file
+		return "test-local-addd", nil
+	})
+	*/
+
 	// Wire WASM fetcher: lets the WorkManager inline compiled WASM bytes
 	// into the task payload so Android can execute without a separate download.
 	sinkService.SetWasmFetcher(func(ctx context.Context, lambdaID string) ([]byte, error) {
+		/*
+		// FALLBACK FOR LOCAL TESTING:
+		if lambdaID == "test-local-addd" {
+			log.Printf("[WorkManager] 📁 Reading local test file for lambda: %s", lambdaID)
+			return os.ReadFile("/Users/adarsh/Projects/devlup/milf/consumeronlywamr/test/addd.wasm")
+		}
+		*/
+
 		lambda, err := functionRepo.FindByID(ctx, lambdaID)
 		if err != nil {
 			return nil, err
 		}
-		return []byte(lambda.WasmRef), nil
+		if len(lambda.WasmRef) == 0 {
+			return nil, fmt.Errorf("WASM ref is empty")
+		}
+		return base64.StdEncoding.DecodeString(lambda.WasmRef)
 	})
 
 	sinkHandler := sinkhandler.NewSinkHandler(sinkService)

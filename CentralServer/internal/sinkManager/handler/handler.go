@@ -223,10 +223,17 @@ func (h *SinkHandler) ConnectWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		switch msg.Type {
 		case domain.MsgHeartbeat:
-			// Process heartbeat via existing service method by converting payload if needed.
-			// To keep it simple, we can just mark the sink online manually or parse payload.
-			log.Printf("Received WS Heartbeat from %s", sinkID)
-			
+			// Parse and process the heartbeat so the sink is marked Online
+			payloadBytes, _ := json.Marshal(msg.Payload)
+			var hbReq domain.HeartbeatRequest
+			if err := json.Unmarshal(payloadBytes, &hbReq); err == nil {
+				if hbReq.SinkID == "" {
+					hbReq.SinkID = sinkID // fall back to URL param
+				}
+				_, _ = h.service.ProcessHeartbeat(r.Context(), &hbReq)
+				log.Printf("Processed WS Heartbeat from %s (RAM:%dMB)", sinkID, hbReq.RAMAvailableMB)
+			}
+
 		case domain.MsgTaskResult:
 			// Parse the payload into a TaskResultRequest
 			payloadBytes, _ := json.Marshal(msg.Payload)

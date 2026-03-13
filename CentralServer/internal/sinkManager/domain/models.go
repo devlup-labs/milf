@@ -207,6 +207,8 @@ type SinkManagerService interface {
 	StartStaleDetector(ctx context.Context, staleThreshold time.Duration)
 	StopStaleDetector()
 	GetSinkForLambda(ctx context.Context, lambdaID string) (string, bool)
+	NotifyNewJob(ctx context.Context)
+
 
 	// WebSocket methods
 	RegisterWebSocket(sinkID string, conn interface{}) // interface{} to avoid circular dep with gorilla/websocket in domain
