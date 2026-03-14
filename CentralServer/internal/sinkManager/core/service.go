@@ -5,6 +5,7 @@ import (
 	"central_server/internal/sinkManager/interfaces"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -450,17 +451,24 @@ func (s *SinkManagerService) tryDispatchToSink(ctx context.Context, sink *domain
 		inputPayload = `{"type":"null"}`
 	}
 
+	// candidate.Job.InputPayload is already a JSON envelope (e.g. {"type": "json", "data": ...})
+	// We just need to parse it into the task.Input map rather than wrapping it again!
+	var inputMap map[string]interface{}
+	if err := json.Unmarshal([]byte(inputPayload), &inputMap); err != nil {
+		inputMap = map[string]interface{}{
+			"type": "json",
+			"data": inputPayload,
+		}
+	}
+
 	task := &domain.Task{
 		ExecutionID: candidate.Job.JobID,
 		LambdaID:    candidate.Job.FuncID,
 		WasmRef:     "", // populated below if wasmFetcher is set
-		Input: map[string]interface{}{
-			"type": "json",
-			"data": inputPayload,
-		},
-		SinkID:    sink.ID,
-		Status:    domain.TaskStatusPending,
-		CreatedAt: time.Now().UTC(),
+		Input:       inputMap,
+		SinkID:      sink.ID,
+		Status:      domain.TaskStatusPending,
+		CreatedAt:   time.Now().UTC(),
 	}
 
 	// Try to inline WASM bytes as base64 if fetcher is wired

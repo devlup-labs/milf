@@ -12,4 +12,7 @@ type ObjectStore interface {
 
 	// Store metadata (entry point, memory, timeout)
 	StoreMetadata(lambdaID string, meta domain.FunctionMetadata) error
+
+	// Update the compilation status of a function
+	UpdateStatus(lambdaID string, status string) error
 }

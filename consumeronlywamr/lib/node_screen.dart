@@ -356,6 +356,47 @@ class _WasmEventCard extends StatelessWidget {
             style: const TextStyle(
                 color: Colors.white30, fontSize: 9, fontFamily: 'monospace'),
           ),
+          if (event.success != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: event.success!
+                    ? Colors.greenAccent.withValues(alpha: 0.05)
+                    : Colors.redAccent.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: event.success!
+                      ? Colors.greenAccent.withValues(alpha: 0.3)
+                      : Colors.redAccent.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.success! ? 'OUTPUT' : 'ERROR',
+                    style: TextStyle(
+                      color: event.success! ? Colors.greenAccent : Colors.redAccent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    event.success! ? '${event.output}' : '${event.errorMessage}',
+                    style: TextStyle(
+                      color: event.success! ? Colors.white70 : Colors.redAccent.shade100,
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

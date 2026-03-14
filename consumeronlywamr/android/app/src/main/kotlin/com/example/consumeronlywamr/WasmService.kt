@@ -21,7 +21,7 @@ class WasmService : Service() {
                         funcName: String?,
                         args: IntArray?
                 ): Int {
-                    if (wasmBytes == null || funcName == null || args == null) return -1
+                    if (wasmBytes == null || funcName == null || args == null) return -1  // should be correct json format 
                     return this@WasmService.invokeWasm(wasmBytes, funcName, args)
                 }
 

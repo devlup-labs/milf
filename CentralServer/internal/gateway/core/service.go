@@ -5,6 +5,7 @@ import (
 	"central_server/internal/gateway/interfaces"
 	"central_server/utils"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -75,7 +76,8 @@ func (s *LambdaService) TriggerLambda(ctx context.Context, req *domain.LambdaExe
 		}
 	}
 
-	ack, err := s.SendTriggerWithID(ctx, trigID, req.ReferenceID, fmt.Sprintf("%v", req.Input))
+	inputBytes, _ := json.Marshal(req.Input)
+	ack, err := s.SendTriggerWithID(ctx, trigID, req.ReferenceID, string(inputBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +168,7 @@ func (s *LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaSto
 		Runtime:    req.Runtime,
 		MemoryMB:   req.MemoryMB,
 		RunType:    req.RunType,
+		Status:     "uncompiled",
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -281,6 +284,23 @@ func (s *LambdaService) ExecuteJob(ctx context.Context, funcID string, input str
 	}
 
 	trigID := uuid.New().String()
+
+	// Create execution record in database
+	execution := &domain.Execution{
+		ID:          trigID,
+		LambdaID:    funcID,
+		ReferenceID: funcID,
+		Input:       map[string]interface{}{"raw": input},
+		Status:      domain.ExecutionStatusPending,
+		StartedAt:   time.Now(),
+	}
+
+	if s.executionRepo != nil {
+		if err := s.executionRepo.Create(ctx, execution); err != nil {
+			utils.Error(fmt.Sprintf("[Gateway] Failed to create execution record for ExecuteJob: %v", err))
+		}
+	}
+
 	ack, err := s.orchestrator.ReceiveTrigger(ctx, trigID, funcID, input)
 	if err != nil {
 		utils.Error(fmt.Sprintf("[Gateway] Error sending trigger for %s: %v", funcID, err))
@@ -327,4 +347,28 @@ func (s *LambdaService) ListExecutions(ctx context.Context, userID string) ([]*d
 // DeleteLambda deletes a lambda function
 func (s *LambdaService) DeleteLambda(ctx context.Context, lambdaID string) error {
 	return s.gatewayDB.Delete(ctx, lambdaID)
+}
+
+func (s *LambdaService) SyncPendingTasks(ctx context.Context) error {
+	if s.executionRepo == nil {
+		return nil
+	}
+	pending, err := s.executionRepo.ListPending(ctx)
+	if err != nil {
+		return err
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+
+	utils.Info(fmt.Sprintf("[Gateway] Syncing %d pending tasks found in DB", len(pending)))
+	for _, exec := range pending {
+		input, _ := json.Marshal(exec.Input)
+		// Re-trigger via orchestrator so it goes into the active queue
+		_, err := s.orchestrator.ReceiveTrigger(ctx, exec.ID, exec.LambdaID, string(input))
+		if err != nil {
+			utils.Error(fmt.Sprintf("[Gateway] Failed to sync task %s: %v", exec.ID, err))
+		}
+	}
+	return nil
 }

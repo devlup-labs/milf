@@ -211,8 +211,8 @@ func (h *LambdaHandler) Execute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Assuming ActivateJob can be reused or we create ExecuteJob
-	ack, err := h.service.ExecuteJob(r.Context(), lambdaID, fmt.Sprintf("%v", input))
+	inputBytes, _ := json.Marshal(input)
+	ack, err := h.service.ExecuteJob(r.Context(), lambdaID, string(inputBytes))
 	if err != nil {
 		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
 		return

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 
@@ -102,6 +103,7 @@ func main() {
 	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue, executionRepo)
 	orchestrator := orchcore.NewOrchestrator(functionRepo, lambdaService, queueService)
 	compiler := compilercore.NewCompiler(objectStore, trigger, compQueue, orchestrator)
+	compiler.SetClangPath(os.Getenv("CLANG_PATH"))
 	go compiler.Start(ctx)
 
 	// 4. Wire Circular Dependencies
@@ -170,6 +172,14 @@ func main() {
 
 	sinkHandler := sinkhandler.NewSinkHandler(sinkService)
 	sinkRouter := sinkinterfaces.NewRouter(sinkHandler, authHandler.AuthMiddleware)
+
+	// Automatically re-enqueue pending tasks from the database into the memory queue
+	go func() {
+		time.Sleep(2 * time.Second)
+		if err := lambdaService.SyncPendingTasks(ctx); err != nil {
+			log.Printf("[Gateway] Error syncing pending tasks: %v", err)
+		}
+	}()
 
 	// --- HTTP SERVER ---
 	mux := http.NewServeMux()

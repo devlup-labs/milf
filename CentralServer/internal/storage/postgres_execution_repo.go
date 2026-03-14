@@ -172,3 +172,61 @@ func (r *PostgresExecutionRepo) ListByLambda(ctx context.Context, lambdaID strin
 
 	return executions, rows.Err()
 }
+
+// ListPending retrieves all executions with 'pending' status
+func (r *PostgresExecutionRepo) ListPending(ctx context.Context) ([]*domain.Execution, error) {
+	query := `
+	SELECT id, lambda_id, reference_id, input, status, output, error, started_at, finished_at
+	FROM executions
+	WHERE status = 'pending'
+	ORDER BY started_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var executions []*domain.Execution
+	for rows.Next() {
+		execution := &domain.Execution{}
+		var inputJSON, outputJSON []byte
+		var errorMsg sql.NullString
+		var finishedAt pq.NullTime
+
+		err := rows.Scan(
+			&execution.ID,
+			&execution.LambdaID,
+			&execution.ReferenceID,
+			&inputJSON,
+			&execution.Status,
+			&outputJSON,
+			&errorMsg,
+			&execution.StartedAt,
+			&finishedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(inputJSON) > 0 {
+			json.Unmarshal(inputJSON, &execution.Input)
+		}
+		if len(outputJSON) > 0 {
+			json.Unmarshal(outputJSON, &execution.Output)
+		}
+
+		if errorMsg.Valid {
+			execution.Error = errorMsg.String
+		}
+
+		if finishedAt.Valid {
+			execution.FinishedAt = &finishedAt.Time
+		}
+
+		executions = append(executions, execution)
+	}
+
+	return executions, rows.Err()
+}

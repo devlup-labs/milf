@@ -29,10 +29,12 @@ export interface InvocationEntity {
   functionId: string;
   functionName: string;
   requestId: string;
-  status: "success" | "error";
+  status: "success" | "error" | "running" | "pending";
   durationMs: number;
   memoryUsedMb: number;
   timestamp: string; // ISO
+  output?: any;
+  error?: string;
 }
 
 export interface LogEntity {

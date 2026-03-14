@@ -18,6 +18,7 @@ type Compiler struct {
 	trigger      interfaces.RunTrigger
 	queue        *gwdomain.CompilationQueue
 	orchestrator gwinterfaces.OrchestratorService
+	clangPath    string
 }
 
 func NewCompiler(
@@ -31,6 +32,13 @@ func NewCompiler(
 		trigger:      trigger,
 		queue:        queue,
 		orchestrator: orchestrator,
+		clangPath:    "/usr/bin/clang", // Default if not provided
+	}
+}
+
+func (c *Compiler) SetClangPath(path string) {
+	if path != "" {
+		c.clangPath = path
 	}
 }
 
@@ -93,6 +101,10 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 		ce := newCompilationError(req.LambdaID, "store", err)
 		return nil, &ce
 	}
+
+	// ALSO Save a copy to the local generated_wasm folder for easy access
+	localPath := fmt.Sprintf("/Users/adarsh/Projects/devlup/milf/generated_wasm/%s.wasm", req.LambdaID)
+	_ = os.WriteFile(localPath, wasmBytes, 0644)
 
 	// ---- STORE METADATA STAGE ----
 	meta := req.Metadata
@@ -161,11 +173,13 @@ func (c *Compiler) compileC(req domain.CompilationRequest) ([]byte, error) {
 
 	// 7. Run clang to compile C → WASM (WASI)
 	cmd := exec.Command(
-		"clang",
-		"--target=wasm32-wasi",
-		"--sysroot=/opt/wasi-sdk/share/wasi-sysroot",
-		cFilePath,
+		c.clangPath,
+		"--target=wasm32",
 		"-O2",
+		"-nostdlib",
+		"-Wl,--no-entry",
+		"-Wl,--export-all",
+		cFilePath,
 		"-o",
 		wasmOutputPath,
 	)

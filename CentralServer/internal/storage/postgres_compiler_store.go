@@ -103,7 +103,7 @@ func (s *PostgresObjectStore) StoreWasm(lambdaID string, wasmBytes []byte) error
 	// Update the wasm_ref column with the WASM binary
 	// For now, we'll store the binary directly in the DB
 	// In production, you'd store in S3 and save the reference
-	query := `UPDATE functions SET wasm_ref = $1, updated_at = NOW() WHERE id = $2`
+	query := `UPDATE functions SET wasm_ref = $1, status = 'compiled', updated_at = NOW() WHERE id = $2`
 	_, err := s.db.Exec(query, wasmBytes, lambdaID)
 	return err
 }
@@ -112,4 +112,10 @@ func (s *PostgresObjectStore) StoreMetadata(lambdaID string, meta compilerdomain
 	// Could store metadata in a separate table or JSON column
 	// For now, just return nil as metadata is already in the functions table
 	return nil
+}
+
+func (s *PostgresObjectStore) UpdateStatus(lambdaID string, status string) error {
+	query := `UPDATE functions SET status = $1, updated_at = NOW() WHERE id = $2`
+	_, err := s.db.Exec(query, status, lambdaID)
+	return err
 }

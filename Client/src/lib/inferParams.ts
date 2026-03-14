@@ -65,7 +65,7 @@ export function inferParams(sourceCode: string, runtime: string): FunctionParam[
 
     // Match __attribute__((visibility("default"))) ... rettype name ( params )
     const attrRegex =
-      /__attribute__\s*\(\s*\(\s*visibility\s*\(\s*"default"\s*\)\s*\)\s*\)[^(]*\(\s*([^)]*)\)/g;
+      /__attribute__\s*\(\s*\(\s*visibility\s*\(\s*"default"\s*\)\s*\)\s*\).*?\b(?:int|void|float|double|long)\s+\w+\s*\(\s*([^)]*)\)/g;
 
     let match: RegExpExecArray | null;
     while ((match = attrRegex.exec(collapsed)) !== null) {
@@ -75,8 +75,8 @@ export function inferParams(sourceCode: string, runtime: string): FunctionParam[
       if (params.length > 0) return params;
     }
 
-    // Fallback: plain int main(int a, int b)
-    const plainMain = collapsed.match(/\bint\s+main\s*\(\s*([^)]+)\s*\)/);
+    // Fallback: plain int main(int a, int b) or wasm_main
+    const plainMain = collapsed.match(/\b(?:int|void|float|double|long)\s+(?:wasm_)?main\s*\(\s*([^)]+)\s*\)/);
     if (plainMain) {
       const params = parseParamList(plainMain[1]);
       if (params.length > 0) return params;

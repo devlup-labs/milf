@@ -22,4 +22,5 @@ type ExecutionRepository interface {
 	GetByID(ctx context.Context, id string) (*domain.Execution, error)
 	UpdateStatus(ctx context.Context, id string, status domain.ExecutionStatus, output interface{}, errorMsg string) error
 	ListByLambda(ctx context.Context, lambdaID string) ([]*domain.Execution, error)
+	ListPending(ctx context.Context) ([]*domain.Execution, error)
 }

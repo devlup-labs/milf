@@ -62,7 +62,8 @@ func (o *Orchestrator) DeactivateService(ctx context.Context, funcID string) (bo
 
 // input type yet to be decided
 func (o *Orchestrator) ReceiveTrigger(ctx context.Context, trigID string, funcID string, input string) (bool, error) {
-	jobID := uuid.New().String()
+	// Use trigID as jobID so the execution result correctly maps back to the gateway's execution record
+	jobID := trigID
 	metaData, exists := o.Funcs[funcID]
 	if !exists {
 		// Attempt lazy activation (e.g., after server restart)
