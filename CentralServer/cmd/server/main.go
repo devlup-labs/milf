@@ -1,0 +1,239 @@
+package main
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/joho/godotenv"
+
+	authcore "central_server/internal/auth/core"
+	authhandler "central_server/internal/auth/handler"
+	compilercore "central_server/internal/compiler/core"
+	gwcore "central_server/internal/gateway/core"
+	"central_server/internal/gateway/domain"
+	gwhandler "central_server/internal/gateway/handler" // gwinterfaces alias in original, reusing
+	gwinterfaces "central_server/internal/gateway/interfaces"
+	orchcore "central_server/internal/orchestrator/core"
+	policy "central_server/internal/policy"
+	navqueue "central_server/internal/queueService/core"
+	sinkcore "central_server/internal/sinkManager/core"
+	sinkhandler "central_server/internal/sinkManager/handler"
+	sinkinterfaces "central_server/internal/sinkManager/interfaces"
+	"central_server/internal/storage"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Load .env file
+	godotenv.Load(".env")
+
+	// Load database configuration from environment variables
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "central_server_db"
+	}
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "postgres"
+	}
+	dbPassword := os.Getenv("DB_PASSWORD")
+	if dbPassword == "" {
+		log.Fatal("DB_PASSWORD environment variable not set")
+	}
+
+	// Build connection string
+	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	// Auth - Connect to PostgreSQL
+	userRepo, err := storage.NewPostgresUserRepo(connString)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer userRepo.Close()
+	
+	// Execution repository (same database connection)
+	executionRepo := storage.NewPostgresExecutionRepo(userRepo.GetDB())
+	
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret"
+	}
+	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+
+	// Policy Manager (billing + quota enforcement)
+	policyMgr := policy.NewManager(userRepo.GetDB())
+
+	authService := authcore.NewAuthService(userRepo, jwtSecret, googleClientID, policyMgr)
+	authHandler := authhandler.NewAuthHandler(authService)
+
+	// --- FUNCTION / COMPILER / ORCHESTRATOR WIRING ---
+
+	// 1. Storage - Use PostgreSQL for functions
+	functionRepo := storage.NewPostgresFunctionRepo(userRepo.GetDB())
+	gatewayDB := functionRepo
+	compilerRepo := functionRepo
+
+	// ObjectStore for Compiler - Use PostgreSQL to fetch from same DB
+	objectStore := storage.NewPostgresObjectStore(userRepo.GetDB())
+
+	// Trigger for Compiler
+	trigger := &storage.DummyRunTrigger{}
+
+	// 2. Queues
+	compQueue := domain.NewCompilationQueue()
+
+	queueService := navqueue.NewQueueService()
+
+	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue, executionRepo)
+	orchestrator := orchcore.NewOrchestrator(functionRepo, lambdaService, queueService)
+	compiler := compilercore.NewCompiler(objectStore, trigger, compQueue, orchestrator)
+	compiler.SetClangPath(os.Getenv("CLANG_PATH"))
+	go compiler.Start(ctx)
+
+	// 4. Wire Circular Dependencies
+	lambdaService.SetOrchestrator(orchestrator)
+
+	// 5. Handlers & Routers
+	lambdaHandler := gwhandler.NewLambdaHandler(lambdaService)
+	compatHandler := gwhandler.NewCompatHandler(lambdaService)
+	gatewayRouter := gwinterfaces.NewRouter(lambdaHandler, compatHandler, authHandler.AuthMiddleware)
+	// --- SINK MANAGER ---
+	sinkRepo := storage.NewMemorySinkRepo()
+	taskRepo := storage.NewMemoryTaskRepo()
+	resultRepo := storage.NewMemoryTaskResultRepo()
+	sinkClient := storage.DummySinkClient{}
+
+	// QueueService - already created above
+
+	// ResultCallback: when Android returns a result, update the executionRepo
+	// so the frontend's polling GET /api/v1/executions/{id} sees the final status.
+	resultCallback := func(ctx context.Context, executionID string, result interface{}, execErr error) {
+		if execErr != nil {
+			log.Printf("[WorkManager] ✗ Execution %s FAILED on worker: %v", executionID, execErr)
+			_ = executionRepo.UpdateStatus(ctx, executionID, domain.ExecutionStatusFailed, nil, execErr.Error())
+		} else {
+			log.Printf("[WorkManager] ✔ Execution %s COMPLETED — output: %v", executionID, result)
+			_ = executionRepo.UpdateStatus(ctx, executionID, domain.ExecutionStatusCompleted, result, "")
+		}
+	}
+
+	sinkService := sinkcore.NewSinkManagerService(sinkRepo, taskRepo, resultRepo, sinkClient, queueService, resultCallback, jwtSecret)
+
+	// Break circular dependency
+	queueService.SetSinkManager(sinkService)
+
+	// Wire Recent Function Fetcher: Enables the testing mode where the most recent
+	// function is auto-dispatched to any node that heartbeats if the queue is empty.
+	/*
+	// Wire Recent Function Fetcher: Enables the testing mode where the most recent
+	// function is auto-dispatched to any node that heartbeats if the queue is empty.
+	sinkService.SetRecentFuncFetcher(func(ctx context.Context) (string, error) {
+		// FOR TESTING: return a special ID for the local addd.wasm file
+		return "test-local-addd", nil
+	})
+	*/
+
+	// Wire WASM fetcher: lets the WorkManager inline compiled WASM bytes
+	// into the task payload so Android can execute without a separate download.
+	sinkService.SetWasmFetcher(func(ctx context.Context, lambdaID string) ([]byte, error) {
+		/*
+		// FALLBACK FOR LOCAL TESTING:
+		if lambdaID == "test-local-addd" {
+			log.Printf("[WorkManager] 📁 Reading local test file for lambda: %s", lambdaID)
+			return os.ReadFile("/Users/adarsh/Projects/devlup/milf/consumeronlywamr/test/addd.wasm")
+		}
+		*/
+
+		lambda, err := functionRepo.FindByID(ctx, lambdaID)
+		if err != nil {
+			return nil, err
+		}
+		if len(lambda.WasmRef) == 0 {
+			return nil, fmt.Errorf("WASM ref is empty")
+		}
+		return base64.StdEncoding.DecodeString(lambda.WasmRef)
+	})
+
+	sinkHandler := sinkhandler.NewSinkHandler(sinkService)
+	sinkRouter := sinkinterfaces.NewRouter(sinkHandler, authHandler.AuthMiddleware)
+
+	// Automatically re-enqueue pending tasks from the database into the memory queue
+	go func() {
+		time.Sleep(2 * time.Second)
+		if err := lambdaService.SyncPendingTasks(ctx); err != nil {
+			log.Printf("[Gateway] Error syncing pending tasks: %v", err)
+		}
+	}()
+
+	// --- HTTP SERVER ---
+	mux := http.NewServeMux()
+
+	// CORS middleware
+	cors := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	mux.HandleFunc("/api/v1/auth/register", authHandler.Register)
+	mux.HandleFunc("/api/v1/auth/login", authHandler.Login)
+	mux.HandleFunc("/api/v1/auth/google", authHandler.GoogleLogin)
+
+	// Usage & billing endpoint (requires auth)
+	mux.Handle("/api/v1/users/me/usage", authHandler.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, _ := r.Context().Value("user_id").(string)
+		report, err := policyMgr.GetUsage(r.Context(), userID)
+		if err != nil {
+			http.Error(w, "failed to get usage", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(report)
+	})))
+
+	// Mount gateway routes
+	gatewayMux := gatewayRouter.Setup()
+	mux.Handle("/api/v1/lambdas", gatewayMux)
+	mux.Handle("/api/v1/lambdas/", gatewayMux)
+	mux.Handle("/api/v1/executions/", gatewayMux)
+	mux.Handle("/health", gatewayMux)
+
+	mux.Handle("/functions", gatewayMux)
+	mux.Handle("/functions/", gatewayMux)
+	mux.Handle("/invocations", gatewayMux)
+
+	// Mount sink manager routes
+	sinkMux := sinkRouter.Setup()
+	mux.Handle("/api/v1/sinks", sinkMux)
+	mux.Handle("/api/v1/sinks/", sinkMux)
+	mux.Handle("/api/v1/tasks/", sinkMux)
+
+	addr := ":8080"
+	log.Printf("server listening on %s", addr)
+	if err := http.ListenAndServe(addr, cors(mux)); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
+}

@@ -1,0 +1,343 @@
+> Task :gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle:compileKotlin UP-TO-DATE
+> Task :gradle:compileJava NO-SOURCE
+> Task :gradle:compileGroovy NO-SOURCE
+> Task :gradle:pluginDescriptors UP-TO-DATE
+> Task :gradle:processResources UP-TO-DATE
+> Task :gradle:classes UP-TO-DATE
+> Task :gradle:jar UP-TO-DATE
+> Task :app:DebugMinSdkCheck
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:compileFlutterBuildDebug UP-TO-DATE
+> Task :app:packJniLibsflutterBuildDebug UP-TO-DATE
+> Task :file_picker:preBuild UP-TO-DATE
+> Task :file_picker:preDebugBuild UP-TO-DATE
+> Task :file_picker:writeDebugAarMetadata UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:preBuild UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:preDebugBuild UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:cleanMergeDebugAssets
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :file_picker:mergeDebugShaders UP-TO-DATE
+> Task :file_picker:compileDebugShaders NO-SOURCE
+> Task :file_picker:generateDebugAssets UP-TO-DATE
+> Task :file_picker:mergeDebugAssets UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:mergeDebugShaders UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:compileDebugShaders NO-SOURCE
+> Task :flutter_plugin_android_lifecycle:generateDebugAssets UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:mergeDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:copyFlutterAssetsDebug
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :file_picker:generateDebugResValues UP-TO-DATE
+> Task :file_picker:generateDebugResources UP-TO-DATE
+> Task :file_picker:packageDebugResources UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:generateDebugResValues UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:generateDebugResources UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :file_picker:extractDeepLinksDebug UP-TO-DATE
+> Task :file_picker:processDebugManifest UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:extractDeepLinksDebug UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:outputDebugAppLinkSettings UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :file_picker:compileDebugLibraryResources UP-TO-DATE
+> Task :file_picker:parseDebugLocalResources UP-TO-DATE
+> Task :file_picker:generateDebugRFile UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:compileDebugLibraryResources UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:parseDebugLocalResources UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :file_picker:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :flutter_plugin_android_lifecycle:javaPreCompileDebug UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:compileDebugJavaWithJavac UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :file_picker:compileDebugKotlin UP-TO-DATE
+> Task :file_picker:javaPreCompileDebug UP-TO-DATE
+> Task :file_picker:compileDebugJavaWithJavac NO-SOURCE
+> Task :file_picker:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :file_picker:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :file_picker:processDebugJavaRes UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:processDebugJavaRes NO-SOURCE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :file_picker:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :app:configureCMakeDebug[arm64-v8a]
+> Task :app:mergeLibDexDebug
+
+> Task :app:compileDebugKotlin FAILED
+e: file:///Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/kotlin/com/example/consumeronlywamr/MainActivity.kt:15:30 Unresolved reference 'WasmServiceInterface'.
+e: file:///Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/kotlin/com/example/consumeronlywamr/MainActivity.kt:21:35 Unresolved reference 'WasmServiceInterface'.
+e: file:///Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/kotlin/com/example/consumeronlywamr/MainActivity.kt:47:55 Unresolved reference 'runWasm'.
+e: file:///Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/kotlin/com/example/consumeronlywamr/WasmService.kt:15:35 Unresolved reference 'WasmServiceInterface'.
+e: file:///Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/kotlin/com/example/consumeronlywamr/WasmService.kt:16:9 'runWasm' overrides nothing.
+e: file:///Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/kotlin/com/example/consumeronlywamr/WasmService.kt:23:16 Return type mismatch: expected 'IBinder', actual '<anonymous>'.
+
+> Task :app:buildCMakeDebug[arm64-v8a] FAILED
+C/C++: ninja: Entering directory `/Users/adarsh/Projects/personal/consumeronlywamr/build/.cxx/debug/5q33595m/arm64-v8a'
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_common.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_common.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_common.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_common.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_common.c:6:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/../wasm_runtime_common.h:9:10: fatal error: 'bh_platform.h' file not found
+C/C++:     9 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/arch/invokeNative_general.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/arch/invokeNative_general.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/arch/invokeNative_general.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/arch/invokeNative_general.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/arch/invokeNative_general.c:6:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/arch/../wasm_runtime_common.h:9:10: fatal error: 'bh_platform.h' file not found
+C/C++:     9 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_type.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_type.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_type.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_type.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_type.c:6:
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_type.h:9:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include/../interpreter/wasm.h:9:10: fatal error: 'bh_platform.h' file not found
+C/C++:     9 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/stringref/stringref_stub.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/stringref/stringref_stub.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/stringref/stringref_stub.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/stringref/stringref_stub.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/stringref/stringref_stub.c:9:
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/stringref/string_object.h:9:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter/wasm.h:9:10: fatal error: 'bh_platform.h' file not found
+C/C++:     9 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_object.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_object.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_object.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_object.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_object.c:6:
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_object.h:9:
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_type.h:9:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include/../interpreter/wasm.h:9:10: fatal error: 'bh_platform.h' file not found
+C/C++:     9 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_blocking_op.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_blocking_op.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_blocking_op.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_blocking_op.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_blocking_op.c:6:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_runtime_common.h:9:10: fatal error: 'bh_platform.h' file not found
+C/C++:     9 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_memory.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_memory.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_memory.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_memory.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_memory.c:6:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_runtime_common.h:9:10: fatal error: 'bh_platform.h' file not found
+C/C++:     9 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_application.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_application.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_application.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_application.c
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_application.c:6:10: fatal error: 'bh_platform.h' file not found
+C/C++:     6 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_loader_common.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_loader_common.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_loader_common.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_loader_common.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_loader_common.c:5:
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_loader_common.h:10:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/../interpreter/wasm.h:9:10: fatal error: 'bh_platform.h' file not found
+C/C++:     9 | #include "bh_platform.h"
+C/C++:       |          ^~~~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_exec_env.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_exec_env.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_exec_env.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_exec_env.c
+C/C++: In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_exec_env.c:6:
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_exec_env.h:9:10: fatal error: 'bh_assert.h' file not found
+C/C++:     9 | #include "bh_assert.h"
+C/C++:       |          ^~~~~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_c_api.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_c_api.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_c_api.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_c_api.c
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_c_api.c:6:10: fatal error: 'bh_log.h' file not found
+C/C++:     6 | #include "bh_log.h"
+C/C++:       |          ^~~~~~~~~~
+C/C++: 1 error generated.
+C/C++: /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/native-lib.cpp.o -MF CMakeFiles/native-lib.dir/native-lib.cpp.o.d -o CMakeFiles/native-lib.dir/native-lib.cpp.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/native-lib.cpp
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/native-lib.cpp:86:7: error: no matching function for call to 'wasm_runtime_lookup_function'
+C/C++:    86 |       wasm_runtime_lookup_function(module_inst, "_start", NULL);
+C/C++:       |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include/wasm_export.h:883:1: note: candidate function not viable: requires 2 arguments, but 3 were provided
+C/C++:   883 | wasm_runtime_lookup_function(const wasm_module_inst_t module_inst,
+C/C++:       | ^                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:   884 |                              const char *name);
+C/C++:       |                              ~~~~~~~~~~~~~~~~
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/native-lib.cpp:89:12: error: no matching function for call to 'wasm_runtime_lookup_function'
+C/C++:    89 |     func = wasm_runtime_lookup_function(module_inst, "main", NULL);
+C/C++:       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++: /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include/wasm_export.h:883:1: note: candidate function not viable: requires 2 arguments, but 3 were provided
+C/C++:   883 | wasm_runtime_lookup_function(const wasm_module_inst_t module_inst,
+C/C++:       | ^                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:   884 |                              const char *name);
+C/C++:       |                              ~~~~~~~~~~~~~~~~
+C/C++: 2 errors generated.
+
+[Incubating] Problems report is available at: file:///Users/adarsh/Projects/personal/consumeronlywamr/build/reports/problems/problems-report.html
+
+FAILURE: Build completed with 2 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':app:buildCMakeDebug[arm64-v8a]'.
+> com.android.ide.common.process.ProcessException: ninja: Entering directory `/Users/adarsh/Projects/personal/consumeronlywamr/build/.cxx/debug/5q33595m/arm64-v8a'
+  [1/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_common.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_common.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_common.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_common.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_common.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_common.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_common.c:6:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/../wasm_runtime_common.h:9:10: fatal error: 'bh_platform.h' file not found
+      9 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [2/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/arch/invokeNative_general.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/arch/invokeNative_general.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/arch/invokeNative_general.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/arch/invokeNative_general.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/arch/invokeNative_general.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/arch/invokeNative_general.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/arch/invokeNative_general.c:6:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/arch/../wasm_runtime_common.h:9:10: fatal error: 'bh_platform.h' file not found
+      9 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [3/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_type.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_type.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_type.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_type.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_type.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_type.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_type.c:6:
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_type.h:9:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include/../interpreter/wasm.h:9:10: fatal error: 'bh_platform.h' file not found
+      9 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [4/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/stringref/stringref_stub.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/stringref/stringref_stub.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/stringref/stringref_stub.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/stringref/stringref_stub.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/stringref/stringref_stub.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/stringref/stringref_stub.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/stringref/stringref_stub.c:9:
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/stringref/string_object.h:9:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter/wasm.h:9:10: fatal error: 'bh_platform.h' file not found
+      9 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [5/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_object.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_object.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_object.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_object.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/gc/gc_object.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_object.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_object.c:6:
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_object.h:9:
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/gc/gc_type.h:9:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include/../interpreter/wasm.h:9:10: fatal error: 'bh_platform.h' file not found
+      9 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [6/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_blocking_op.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_blocking_op.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_blocking_op.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_blocking_op.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_blocking_op.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_blocking_op.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_blocking_op.c:6:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_runtime_common.h:9:10: fatal error: 'bh_platform.h' file not found
+      9 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [7/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_memory.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_memory.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_memory.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_memory.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_memory.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_memory.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_memory.c:6:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_runtime_common.h:9:10: fatal error: 'bh_platform.h' file not found
+      9 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [8/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_application.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_application.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_application.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_application.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_application.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_application.c
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_application.c:6:10: fatal error: 'bh_platform.h' file not found
+      6 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [9/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_loader_common.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_loader_common.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_loader_common.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_loader_common.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_loader_common.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_loader_common.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_loader_common.c:5:
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_loader_common.h:10:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/../interpreter/wasm.h:9:10: fatal error: 'bh_platform.h' file not found
+      9 | #include "bh_platform.h"
+        |          ^~~~~~~~~~~~~~~
+  1 error generated.
+  [10/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_exec_env.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_exec_env.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_exec_env.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_exec_env.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_exec_env.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_exec_env.c
+  In file included from /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_exec_env.c:6:
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_exec_env.h:9:10: fatal error: 'bh_assert.h' file not found
+      9 | #include "bh_assert.h"
+        |          ^~~~~~~~~~~~~
+  1 error generated.
+  [11/49] Building C object CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_c_api.c.o
+  FAILED: CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_c_api.c.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_c_api.c.o -MF CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_c_api.c.o.d -o CMakeFiles/native-lib.dir/wamr/core/iwasm/common/wasm_c_api.c.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_c_api.c
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common/wasm_c_api.c:6:10: fatal error: 'bh_log.h' file not found
+      6 | #include "bh_log.h"
+        |          ^~~~~~~~~~
+  1 error generated.
+  [12/49] Building CXX object CMakeFiles/native-lib.dir/native-lib.cpp.o
+  FAILED: CMakeFiles/native-lib.dir/native-lib.cpp.o 
+  /Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++ --target=aarch64-none-linux-android24 --sysroot=/Users/adarsh/Library/Android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/darwin-x86_64/sysroot -DBH_PLATFORM_ANDROID=1 -DWASM_ENABLE_AOT=0 -DWASM_ENABLE_FAST_JIT=0 -DWASM_ENABLE_INTERP=1 -DWASM_ENABLE_JIT=0 -DWASM_ENABLE_LIBC_BUILTIN=1 -Dnative_lib_EXPORTS -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/common -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/interpreter -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/include -I/Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/shared/platform/android -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -fno-limit-debug-info  -fPIC -MD -MT CMakeFiles/native-lib.dir/native-lib.cpp.o -MF CMakeFiles/native-lib.dir/native-lib.cpp.o.d -o CMakeFiles/native-lib.dir/native-lib.cpp.o -c /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/native-lib.cpp
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/native-lib.cpp:86:7: error: no matching function for call to 'wasm_runtime_lookup_function'
+     86 |       wasm_runtime_lookup_function(module_inst, "_start", NULL);
+        |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include/wasm_export.h:883:1: note: candidate function not viable: requires 2 arguments, but 3 were provided
+    883 | wasm_runtime_lookup_function(const wasm_module_inst_t module_inst,
+        | ^                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    884 |                              const char *name);
+        |                              ~~~~~~~~~~~~~~~~
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/native-lib.cpp:89:12: error: no matching function for call to 'wasm_runtime_lookup_function'
+     89 |     func = wasm_runtime_lookup_function(module_inst, "main", NULL);
+        |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  /Users/adarsh/Projects/personal/consumeronlywamr/android/app/src/main/cpp/wamr/core/iwasm/include/wasm_export.h:883:1: note: candidate function not viable: requires 2 arguments, but 3 were provided
+    883 | wasm_runtime_lookup_function(const wasm_module_inst_t module_inst,
+        | ^                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    884 |                              const char *name);
+        |                              ~~~~~~~~~~~~~~~~
+  2 errors generated.
+  ninja: build stopped: subcommand failed.
+  
+  C++ build system [build] failed while executing:
+      /Users/adarsh/Library/Android/sdk/cmake/3.22.1/bin/ninja \
+        -C \
+        /Users/adarsh/Projects/personal/consumeronlywamr/build/.cxx/debug/5q33595m/arm64-v8a \
+        native-lib
+    from /Users/adarsh/Projects/personal/consumeronlywamr/android/app
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1s
+67 actionable tasks: 8 executed, 59 up-to-date
