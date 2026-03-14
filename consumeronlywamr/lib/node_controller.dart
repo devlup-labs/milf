@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +28,9 @@ class WasmEvent {
   final int payloadSizeBytes;
   final String payloadType;
   final DateTime timestamp;
+  dynamic output;
+  bool? success;
+  String? errorMessage;
 
   WasmEvent({
     required this.executionId,
@@ -131,29 +135,94 @@ class NodeController extends ChangeNotifier {
 
     // Record incoming WASM event for the WASM Info tab
     final payloadType = payload.isEmpty ? 'null' : 'binary';
-    wasmEvents.insert(0, WasmEvent(
+    final wasmEvent = WasmEvent(
       executionId: executionId,
       lambdaId: lambdaId,
       wasmSizeBytes: wasmBytes.length,
       payloadSizeBytes: payload.length,
       payloadType: payloadType,
-    ));
+    );
+    wasmEvents.insert(0, wasmEvent);
     notifyListeners();
 
     try {
-      final dynamic result = await _platform
-          .invokeMethod('invokeDataWasm', {
+      // 1. Try to parse JSON and see if it's a simple a,b addition task
+      Map<String, dynamic>? jsonPayload;
+      try {
+        final rawString = utf8.decode(payload);
+        _log('RAW PAYLOAD RECEIVED: $rawString');
+        jsonPayload = jsonDecode(rawString) as Map<String, dynamic>;
+      } catch (e) {
+        _log('Failed to parse payload as JSON: $e');
+      }
+
+      Future<dynamic> methodCall;
+      // Extract optional function name hint (reserved key '_func')
+      final String funcName = (jsonPayload != null && jsonPayload.containsKey('_func'))
+          ? jsonPayload['_func'].toString()
+          : 'wasm_main';
+
+      // Filter out reserved keys to get user-supplied parameters
+      final paramPayload = jsonPayload != null
+          ? Map<String, dynamic>.fromEntries(
+              jsonPayload.entries.where((e) => !e.key.startsWith('_')))
+          : <String, dynamic>{};
+
+      if (paramPayload.isNotEmpty) {
+        // Try to extract all values as integers for the int-array path
+        final List<int> intArgs = [];
+        bool allInts = true;
+        for (final value in paramPayload.values) {
+          if (value is int) {
+            intArgs.add(value);
+          } else if (value is num) {
+            intArgs.add(value.toInt());
+          } else {
+            final parsed = int.tryParse(value.toString());
+            if (parsed != null) {
+              intArgs.add(parsed);
+            } else {
+              allInts = false;
+              break;
+            }
+          }
+        }
+
+        if (allInts && intArgs.isNotEmpty) {
+          _log('Int-args task (${intArgs.length} params): $intArgs → $funcName');
+          methodCall = _platform.invokeMethod('invokeWasm', {
             'bytes': wasmBytes,
-            'funcName': 'invoke',
+            'funcName': funcName,
+            'args': Int32List.fromList(intArgs),
+          });
+        } else {
+          // Has non-integer values → use binary data path
+          _log('Data task → $funcName (non-int values detected)');
+          methodCall = _platform.invokeMethod('invokeDataWasm', {
+            'bytes': wasmBytes,
+            'funcName': funcName,
             'payload': payload,
-          })
-          .timeout(
+          });
+        }
+      } else {
+        // No user parameters — call the function with zero args
+        _log('Zero-arg task → $funcName');
+        methodCall = _platform.invokeMethod('invokeWasm', {
+          'bytes': wasmBytes,
+          'funcName': funcName,
+          'args': Int32List(0),
+        });
+      }
+
+      final dynamic result = await methodCall.timeout(
             const Duration(seconds: 30),
             onTimeout: () => throw Exception('Execution timed out after 30s'),
           );
 
       _sync?.sendResult(executionId, success: true, output: result);
       _log('Task $executionId succeeded.');
+      wasmEvent.success = true;
+      wasmEvent.output = result;
       history.insert(0, ExecutionRecord(
         executionId: executionId,
         lambdaId: lambdaId,
@@ -165,6 +234,8 @@ class NodeController extends ChangeNotifier {
       final msg = e.message ?? 'Native error';
       _sync?.sendResult(executionId, success: false, error: msg);
       _log('Task $executionId FAILED: $msg');
+      wasmEvent.success = false;
+      wasmEvent.errorMessage = msg;
       history.insert(0, ExecutionRecord(
         executionId: executionId,
         lambdaId: lambdaId,
@@ -175,6 +246,8 @@ class NodeController extends ChangeNotifier {
     } catch (e) {
       _sync?.sendResult(executionId, success: false, error: e.toString());
       _log('Task $executionId ERROR: $e');
+      wasmEvent.success = false;
+      wasmEvent.errorMessage = e.toString();
       history.insert(0, ExecutionRecord(
         executionId: executionId,
         lambdaId: lambdaId,

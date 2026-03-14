@@ -6,6 +6,7 @@ import (
 	sinkDomain "central_server/internal/sinkManager/domain"
 	"central_server/utils"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"sync"
@@ -134,14 +135,19 @@ func (s *QueueService) DispatchOrEnqueue(ctx context.Context, jobID string, func
 			input[k] = v
 		}
 
+		var inputMap map[string]interface{}
+		if err := json.Unmarshal([]byte(inputPayload), &inputMap); err != nil {
+			inputMap = map[string]interface{}{
+				"type": "json",
+				"data": inputPayload,
+			}
+		}
+
 		task := &sinkDomain.Task{
 			ExecutionID: jobID,
 			LambdaID:    funcID,
 			WasmRef:     metaData["wasmRef"],
-			Input: map[string]interface{}{
-				"type": "json", // Default to JSON for triggers
-				"data": inputPayload,
-			},
+			Input:       inputMap,
 			SinkID:    sinkID,
 			Status:    sinkDomain.TaskStatusPending,
 			CreatedAt: time.Now().UTC(),

@@ -27,7 +27,7 @@ func (c *Compiler) Start(ctx context.Context) {
 			_, compErr := c.Compile(job.FuncID)
 			if compErr != nil {
 				utils.Error(fmt.Sprintf("[CompilerWorker] Compilation failed for %s: %v", job.FuncID, compErr))
-				// TODO: Update status to failed in DB?
+				_ = c.objectStore.UpdateStatus(job.FuncID, "failed")
 				continue
 			}
 			utils.Info(fmt.Sprintf("[CompilerWorker] Compilation successful for %s", job.FuncID))

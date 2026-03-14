@@ -77,6 +77,15 @@ export default function Invocations() {
       ),
     },
     {
+      key: "output",
+      header: "Output",
+      render: (inv: InvocationEntity) => (
+        <span className="text-muted-foreground font-mono text-xs">
+          {inv.output ? JSON.stringify(inv.output) : "-"}
+        </span>
+      ),
+    },
+    {
       key: "timestamp",
       header: "Time",
       className: "text-right",

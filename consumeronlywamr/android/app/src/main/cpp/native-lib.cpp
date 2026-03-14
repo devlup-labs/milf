@@ -346,8 +346,8 @@ Java_com_example_consumeronlywamr_WasmService_invokeWasm(JNIEnv *env, jobject,
     goto cleanup;
   }
 
-  // 3. Instantiate₹₹
-  module_inst = wasm_runtime_instantiate(module, 8192, 8192, error_buf,
+  // 3. Instantiate
+  module_inst = wasm_runtime_instantiate(module, 65536, 65536, error_buf,
                                          sizeof(error_buf));
   if (!module_inst) {
     LOGE("Instantiation failed: %s", error_buf);
@@ -365,31 +365,62 @@ Java_com_example_consumeronlywamr_WasmService_invokeWasm(JNIEnv *env, jobject,
   {
     wasm_function_inst_t func =
         wasm_runtime_lookup_function(module_inst, nativeFuncName);
-    // Fallbacks if the requested function name isn't found
+    const char *resolvedName = nativeFuncName;
+
+    // Fallback chain: requested → main → app_main → _start
     if (!func && strcmp(nativeFuncName, "main") != 0) {
-        func = wasm_runtime_lookup_function(module_inst, "main");
+      func = wasm_runtime_lookup_function(module_inst, "main");
+      if (func) resolvedName = "main";
     }
     if (!func) {
-        func = wasm_runtime_lookup_function(module_inst, "app_main");
+      func = wasm_runtime_lookup_function(module_inst, "app_main");
+      if (func) resolvedName = "app_main";
     }
+    if (!func) {
+      func = wasm_runtime_lookup_function(module_inst, "_start");
+      if (func) resolvedName = "_start";
+    }
+
     if (func) {
-      // Create argv buffer. WAMR needs space for both args and result.
-      // Since we expect 1 result, we need max(argCount, 1).
-      uint32_t *argv =
-          (uint32_t *)malloc(sizeof(uint32_t) * (argCount > 0 ? argCount : 1));
-      for (int i = 0; i < argCount; i++) {
+      LOGI("Resolved function: '%s' (requested: '%s')", resolvedName,
+           nativeFuncName);
+
+      // Validate argument count against WASM signature
+      uint32_t expectedParams =
+          wasm_func_get_param_count(func, module_inst);
+      uint32_t actualArgCount = (uint32_t)argCount;
+
+      if (actualArgCount != expectedParams) {
+        LOGI("Arg count adjustment: provided %d, '%s' expects %d",
+             argCount, resolvedName, expectedParams);
+        // Use the expected count — pad with 0 or ignore extras
+        actualArgCount = expectedParams;
+      }
+
+      // Allocate argv: max of expectedParams and 1 (for result)
+      uint32_t bufSize = expectedParams > 0 ? expectedParams : 1;
+      uint32_t *argv = (uint32_t *)malloc(sizeof(uint32_t) * bufSize);
+      memset(argv, 0, sizeof(uint32_t) * bufSize);
+
+      // Copy provided args up to expectedParams
+      for (int i = 0; i < argCount && i < (int)expectedParams; i++) {
         argv[i] = (uint32_t)nativeArgs[i];
       }
 
-      if (wasm_runtime_call_wasm(exec_env, func, argCount, argv)) {
+      LOGI("Calling '%s' with %d args", resolvedName, actualArgCount);
+
+      if (wasm_runtime_call_wasm(exec_env, func, actualArgCount, argv)) {
         result = (jint)argv[0];
-        LOGI("invokeWasm: %s executed. Result: %d", nativeFuncName, result);
+        LOGI("invokeWasm success: %s (result: %d)", resolvedName, result);
       } else {
-        LOGE("Execution failed: %s", wasm_runtime_get_exception(module_inst));
+        const char *exception = wasm_runtime_get_exception(module_inst);
+        LOGE("Execution failed for '%s': %s", resolvedName, exception ? exception : "unknown");
+        result = -2; // Distinct error code for call failure
       }
       free(argv);
     } else {
-      LOGE("Function '%s' not found in WASM module", nativeFuncName);
+      LOGE("Function '%s' (and fallbacks main/app_main/_start) not found",
+           nativeFuncName);
     }
   }
 

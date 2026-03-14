@@ -59,7 +59,7 @@ class MainActivity : FlutterActivity() {
                 "invokeWasm" -> {
                     val bytes = call.argument<ByteArray>("bytes")
                     val func = call.argument<String>("funcName")
-                    val args = call.argument<IntArray>("args")
+                    val args = call.argument<IntArray>("args")  //TODO: need to have the change the type or research on the aws way of taking the input 
 
                     if (bytes != null &&
                                     func != null &&
@@ -81,7 +81,7 @@ class MainActivity : FlutterActivity() {
                 }
                 "invokeDataWasm" -> {
                     val bytes = call.argument<ByteArray>("bytes")
-                    val func = call.argument<String>("funcName")
+                    val func = call.argument<String>("funcName") // TODO: think about the convinient way for this or can be use something as lambda_handler
                     val payload = call.argument<ByteArray>("payload")
                     val hostPath = applicationContext.cacheDir.absolutePath
 

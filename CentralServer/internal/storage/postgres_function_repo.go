@@ -24,8 +24,8 @@ func NewPostgresFunctionRepo(db *sql.DB) *PostgresFunctionRepo {
 // Save stores a new lambda function in the database
 func (r *PostgresFunctionRepo) Save(ctx context.Context, lambda *domain.Lambda) error {
 	query := `
-	INSERT INTO functions (id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, created_at, updated_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	INSERT INTO functions (id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, status, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	ON CONFLICT (id) DO UPDATE SET
 		name = EXCLUDED.name,
 		runtime = EXCLUDED.runtime,
@@ -33,6 +33,7 @@ func (r *PostgresFunctionRepo) Save(ctx context.Context, lambda *domain.Lambda) 
 		source_code = EXCLUDED.source_code,
 		wasm_ref = EXCLUDED.wasm_ref,
 		run_type = EXCLUDED.run_type,
+		status = EXCLUDED.status,
 		updated_at = EXCLUDED.updated_at
 	`
 
@@ -45,6 +46,7 @@ func (r *PostgresFunctionRepo) Save(ctx context.Context, lambda *domain.Lambda) 
 		string(lambda.SourceCode),
 		lambda.WasmRef,
 		string(lambda.RunType),
+		lambda.Status,
 		lambda.CreatedAt,
 		lambda.UpdatedAt,
 	)
@@ -55,7 +57,7 @@ func (r *PostgresFunctionRepo) Save(ctx context.Context, lambda *domain.Lambda) 
 // FindByID retrieves a lambda function by ID
 func (r *PostgresFunctionRepo) FindByID(ctx context.Context, id string) (*domain.Lambda, error) {
 	query := `
-	SELECT id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, created_at, updated_at
+	SELECT id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, status, created_at, updated_at
 	FROM functions
 	WHERE id = $1
 	`
@@ -73,6 +75,7 @@ func (r *PostgresFunctionRepo) FindByID(ctx context.Context, id string) (*domain
 		&lambda.SourceCode,
 		&wasmBytes,
 		&runType,
+		&lambda.Status,
 		&lambda.CreatedAt,
 		&lambda.UpdatedAt,
 	)
@@ -96,12 +99,13 @@ func (r *PostgresFunctionRepo) FindByID(ctx context.Context, id string) (*domain
 // FindByWasmRef retrieves a lambda function by WasmRef
 func (r *PostgresFunctionRepo) FindByWasmRef(ctx context.Context, wasmRef string) (*domain.Lambda, error) {
 	query := `
-	SELECT id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, created_at, updated_at
+	SELECT id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, status, created_at, updated_at
 	FROM functions
 	WHERE wasm_ref = $1
 	`
 
 	lambda := &domain.Lambda{}
+	var wasmBytes []byte
 	var runtime, runType string
 
 	err := r.db.QueryRowContext(ctx, query, wasmRef).Scan(
@@ -111,8 +115,9 @@ func (r *PostgresFunctionRepo) FindByWasmRef(ctx context.Context, wasmRef string
 		&runtime,
 		&lambda.MemoryMB,
 		&lambda.SourceCode,
-		&lambda.WasmRef,
+		&wasmBytes,
 		&runType,
+		&lambda.Status,
 		&lambda.CreatedAt,
 		&lambda.UpdatedAt,
 	)
@@ -126,6 +131,9 @@ func (r *PostgresFunctionRepo) FindByWasmRef(ctx context.Context, wasmRef string
 
 	lambda.Runtime = domain.RuntimeEnvironment(runtime)
 	lambda.RunType = domain.RunType(runType)
+	if len(wasmBytes) > 0 {
+		lambda.WasmRef = base64.StdEncoding.EncodeToString(wasmBytes)
+	}
 
 	return lambda, nil
 }
@@ -153,10 +161,10 @@ func (r *PostgresFunctionRepo) Delete(ctx context.Context, id string) error {
 
 // GetStatus retrieves the status of a lambda function
 func (r *PostgresFunctionRepo) GetStatus(ctx context.Context, funcID string) (string, error) {
-	query := `SELECT id FROM functions WHERE id = $1`
+	query := `SELECT status FROM functions WHERE id = $1`
 	
-	var id string
-	err := r.db.QueryRowContext(ctx, query, funcID).Scan(&id)
+	var status string
+	err := r.db.QueryRowContext(ctx, query, funcID).Scan(&status)
 	
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -165,7 +173,7 @@ func (r *PostgresFunctionRepo) GetStatus(ctx context.Context, funcID string) (st
 		return "", err
 	}
 	
-	return "compiled", nil
+	return status, nil
 }
 
 // List returns all lambdas, optionally filtered by userID
@@ -175,10 +183,10 @@ func (r *PostgresFunctionRepo) List(ctx context.Context, userID string) ([]*doma
 	var err error
 
 	if userID != "" && userID != "unknown" {
-		query = `SELECT id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, created_at, updated_at FROM functions WHERE user_id = $1 ORDER BY created_at DESC`
+		query = `SELECT id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, status, created_at, updated_at FROM functions WHERE user_id = $1 ORDER BY created_at DESC`
 		rows, err = r.db.QueryContext(ctx, query, userID)
 	} else {
-		query = `SELECT id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, created_at, updated_at FROM functions ORDER BY created_at DESC`
+		query = `SELECT id, user_id, name, runtime, memory_mb, source_code, wasm_ref, run_type, status, created_at, updated_at FROM functions ORDER BY created_at DESC`
 		rows, err = r.db.QueryContext(ctx, query)
 	}
 
@@ -202,6 +210,7 @@ func (r *PostgresFunctionRepo) List(ctx context.Context, userID string) ([]*doma
 			&lambda.SourceCode,
 			&wasmBytes,
 			&runType,
+			&lambda.Status,
 			&lambda.CreatedAt,
 			&lambda.UpdatedAt,
 		)
@@ -223,15 +232,16 @@ func (r *PostgresFunctionRepo) List(ctx context.Context, userID string) ([]*doma
 // GetLambdaMetadata returns minimal metadata needed by the orchestrator
 func (r *PostgresFunctionRepo) GetLambdaMetadata(ctx context.Context, funcID string) (map[string]string, error) {
 	query := `
-	SELECT user_id, memory_mb
+	SELECT user_id, memory_mb, status
 	FROM functions
 	WHERE id = $1
 	`
 
 	var userID string
 	var memoryMB int
+	var status string
 
-	err := r.db.QueryRowContext(ctx, query, funcID).Scan(&userID, &memoryMB)
+	err := r.db.QueryRowContext(ctx, query, funcID).Scan(&userID, &memoryMB, &status)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New("lambda not found")
@@ -241,7 +251,7 @@ func (r *PostgresFunctionRepo) GetLambdaMetadata(ctx context.Context, funcID str
 
 	meta := make(map[string]string)
 	meta["user_id"] = userID
-	meta["status"] = "compiled"
+	meta["status"] = status
 	meta["maxRam"] = fmt.Sprintf("%d", memoryMB)
 	return meta, nil
 }

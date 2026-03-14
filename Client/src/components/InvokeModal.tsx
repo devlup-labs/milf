@@ -50,6 +50,7 @@ export function InvokeModal({
   const [rawJson, setRawJson] = useState("");
   const [rawJsonError, setRawJsonError] = useState("");
   const [mode, setMode] = useState<"guided" | "raw">("guided");
+  const [startFunction, setStartFunction] = useState("wasm_main");
 
   // Reset fields when modal opens
   useEffect(() => {
@@ -59,8 +60,9 @@ export function InvokeModal({
         initial[p.name] = { value: "", touched: false, valid: null };
       }
       setFields(initial);
+      setStartFunction("wasm_main");
       // Build a readable default raw-JSON example from inferred params
-      const exampleData: Record<string, unknown> = {};
+      const exampleData: Record<string, unknown> = { _func: "wasm_main" };
       for (const p of params) {
         exampleData[p.name] = p.type === "int" || p.type === "long" ? 42
           : p.type === "float" || p.type === "double" ? 3.14
@@ -102,7 +104,7 @@ export function InvokeModal({
       }
     }
 
-    const data: Record<string, unknown> = {};
+    const data: Record<string, unknown> = { _func: startFunction || "wasm_main" };
     for (const p of params) {
       const raw = fields[p.name]?.value ?? "";
       if (raw === "") continue;
@@ -181,9 +183,26 @@ export function InvokeModal({
                 </button>
               </div>
             ) : (
-              params.map(param => {
-                const guide = TYPE_GUIDES[param.type];
-                const field = fields[param.name];
+              <div className="space-y-4">
+                <div className="space-y-1.5 pb-2 border-b border-white/5">
+                  <Label className="text-xs text-white/80 font-mono flex justify-between">
+                    _func
+                    <span className="text-[10px] px-1.5 py-0.5 bg-white/10 text-white/40 rounded font-sans">
+                      Start Function
+                    </span>
+                  </Label>
+                  <Input
+                    value={startFunction}
+                    onChange={e => setStartFunction(e.target.value)}
+                    placeholder="wasm_main"
+                    className="h-8 bg-white/5 border border-white/10 text-sm font-mono text-white transition-colors focus:ring-1 focus:ring-blue-500"
+                  />
+                  <p className="text-[10px] text-white/30">Target entrypoint name in the WebAssembly module.</p>
+                </div>
+
+                {params.map(param => {
+                  const guide = TYPE_GUIDES[param.type];
+                  const field = fields[param.name];
                 const showValid = field?.touched && field?.valid !== null;
                 return (
                   <div key={param.name} className="space-y-1.5">
@@ -221,14 +240,15 @@ export function InvokeModal({
                     )}
                   </div>
                 );
-              })
-            )
-          ) : (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-white/60">Input Payload (TaskEnvelope JSON)</Label>
-              <div className="relative">
-                <textarea
-                  value={rawJson}
+              })}
+            </div>
+          )
+        ) : (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-white/60">Input Payload (TaskEnvelope JSON)</Label>
+            <div className="relative">
+              <textarea
+                value={rawJson}
                   onChange={e => { setRawJson(e.target.value); setRawJsonError(""); }}
                   rows={8}
                   className={cn(

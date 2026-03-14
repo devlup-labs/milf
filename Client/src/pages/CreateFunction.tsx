@@ -51,7 +51,7 @@ export default function CreateFunction() {
 // Export the function — this is what the WASM runtime will call.
 // Parameters become the user-provided inputs at invocation time.
 __attribute__((visibility("default"))) __attribute__((used))
-int main(int a, int b) {
+int wasm_main(int a, int b) {
   return a + b;
 }
 `,

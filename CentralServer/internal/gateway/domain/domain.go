@@ -60,6 +60,7 @@ type Lambda struct {
 	MemoryMB   int                `json:"memory_mb"`
 	RunType    RunType            `json:"run_type"`
 	WasmRef    string             `json:"wasm_ref"`
+	Status     string             `json:"status"`
 	CreatedAt  time.Time          `json:"created_at"`
 	UpdatedAt  time.Time          `json:"updated_at"`
 }
