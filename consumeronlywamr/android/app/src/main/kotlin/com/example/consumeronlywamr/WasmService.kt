@@ -21,8 +21,17 @@ class WasmService : Service() {
                         funcName: String?,
                         args: IntArray?
                 ): Int {
-                    if (wasmBytes == null || funcName == null || args == null) return -1  // should be correct json format 
+                    if (wasmBytes == null || funcName == null || args == null) return -1
                     return this@WasmService.invokeWasm(wasmBytes, funcName, args)
+                }
+
+                override fun invokeWasmString(
+                        wasmBytes: ByteArray?,
+                        funcName: String?,
+                        payload: String?
+                ): String {
+                    if (wasmBytes == null || funcName == null || payload == null) return "Error: Invalid arguments"
+                    return this@WasmService.invokeWasmString(wasmBytes, funcName, payload)
                 }
 
                 override fun runWasm(wasmBytes: ByteArray?): String {
@@ -57,6 +66,7 @@ class WasmService : Service() {
     external fun runWasm(wasmBytes: ByteArray): String
     external fun wasmAdd(wasmBytes: ByteArray, args: IntArray): Int
     external fun invokeWasm(wasmBytes: ByteArray, funcName: String, args: IntArray): Int
+    external fun invokeWasmString(wasmBytes: ByteArray, funcName: String, payload: String): String
     // Removed incorrect override of invokeDataWasm.
     // It should only be implemented in the Stub (binder) or via direct delegation.
 

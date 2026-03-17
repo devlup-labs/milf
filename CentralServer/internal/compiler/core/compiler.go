@@ -7,6 +7,7 @@ import (
 	gwinterfaces "central_server/internal/gateway/interfaces"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,12 +28,18 @@ func NewCompiler(
 	queue *gwdomain.CompilationQueue,
 	orchestrator gwinterfaces.OrchestratorService,
 ) *Compiler {
+	// Try common locations if no path provided
+	defaultPath := "/opt/wasi-sdk/bin/clang"
+	if _, err := os.Stat(defaultPath); os.IsNotExist(err) {
+		defaultPath = "/usr/bin/clang"
+	}
+
 	return &Compiler{
 		objectStore:  objectStore,
 		trigger:      trigger,
 		queue:        queue,
 		orchestrator: orchestrator,
-		clangPath:    "/usr/bin/clang", // Default if not provided
+		clangPath:    defaultPath,
 	}
 }
 
@@ -171,23 +178,45 @@ func (c *Compiler) compileC(req domain.CompilationRequest) ([]byte, error) {
 	// 6. Define output WASM file path
 	wasmOutputPath := filepath.Join(tempDir, "output.wasm")
 
-	// 7. Run clang to compile C → WASM (WASI)
-	cmd := exec.Command(
-		c.clangPath,
-		"--target=wasm32",
-		"-O2",
+	// 7. Find sysroot from clang path. Usually it's in ../share/wasi-sysroot relative to bin/clang
+	sysroot := filepath.Join(filepath.Dir(filepath.Dir(c.clangPath)), "share", "wasi-sysroot")
+
+	// Run clang to compile C → WASM (WASI)
+	args := []string{
+		"--target=wasm32-wasi",
+		fmt.Sprintf("--sysroot=%s", sysroot),
+		"-O1", // Lower optimization to avoid aggressive opcode usage
+		"-mno-bulk-memory",
+		"-mno-mutable-globals",
+		"-mno-sign-ext",
+		"-mno-reference-types",
+		"-mno-nontrapping-fptoint",
+		"-fno-builtin",
 		"-nostdlib",
+		"-fno-builtin-memcpy",
+		"-fno-builtin-memmove",
+		"-fno-builtin-memset",
 		"-Wl,--no-entry",
 		"-Wl,--export-all",
+		"-Wl,--allow-undefined",
+		"-Wl,--strip-all",
+		"-Wl,--no-check-features",
+		"-Xlinker", "--features=mutable-globals,sign-ext",
 		cFilePath,
 		"-o",
 		wasmOutputPath,
-	)
+	}
+
+	log.Printf("[Compiler] Running: %s %v", c.clangPath, args)
+	cmd := exec.Command(c.clangPath, args...)
 
 	// Capture compiler output (errors included)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, errors.New(string(output))
+		if len(output) > 0 {
+			return nil, errors.New(string(output))
+		}
+		return nil, fmt.Errorf("clang execution failed: %w", err)
 	}
 
 	// 8. Read compiled WASM binary into memory

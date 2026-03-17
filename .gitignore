@@ -71,3 +71,4 @@ consumeronlywamr/windows/flutter/ephemeral/
 logs/
 node_modules/
 temp/
+CentralServer/wasi-sdk-24.0-arm64-macos/

@@ -37,7 +37,8 @@ Welcome to the team! Follow these steps to set up the project locally on your ma
 - **PostgreSQL** 14+
 - **WASI SDK**: Required for compiling C code into WASM.
   - Download from [WebAssembly/wasi-sdk](https://github.com/WebAssembly/wasi-sdk)
-  - Extract it to `/opt/wasi-sdk` (or update the compiler config in `CentralServer`).
+  - Extract it (e.g., to `/opt/wasi-sdk`).
+  - Set the `CLANG_PATH` environment variable in `CentralServer/.env` to point to the `bin/clang` inside the SDK.
 
 ### 1. Database Setup
 1. Start PostgreSQL.
@@ -60,7 +61,8 @@ cp .env.example .env
 
 # 3. Download Go modules and run the server
 go mod tidy
-# - Set CLANG_PATH to your wasi-sdk clang (e.g., /opt/wasi-sdk/bin/clang)
+# - Set CLANG_PATH to your wasi-sdk clang binary
+#   Example: CLANG_PATH=/opt/wasi-sdk/bin/clang
 go run cmd/server/main.go
 ```
 *The server will typically start on `http://localhost:8080`.*

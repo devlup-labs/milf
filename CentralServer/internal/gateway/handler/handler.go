@@ -199,29 +199,68 @@ func (h *LambdaHandler) GetWasm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *LambdaHandler) Execute(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[Handler] 🚀 Execute hit for path: %s", r.URL.Path)
 	lambdaID := r.PathValue("id")
 	if lambdaID == "" {
 		writeError(w, http.StatusBadRequest, "Lambda ID is required", "")
 		return
 	}
 
-	var input map[string]interface{}
-	if err := decodeJSON(r, &input); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
-		return
+	// Read body
+	var body interface{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&body); err != nil {
+		// If not JSON, treat as raw string if body is present
+		body = nil 
+	}
+
+	// AWS Lambda Parity: Inject HTTP Context
+	// This allows the WASM function to see headers, query params, etc.
+	input := map[string]interface{}{
+		"_http_context": map[string]interface{}{
+			"method":  r.Method,
+			"path":    r.URL.Path,
+			"headers": r.Header,
+			"query":   r.URL.Query(),
+		},
+		"body": body,
+	}
+
+	// Check for invocation type header
+	invocationType := r.Header.Get("X-Amz-Invocation-Type")
+	if invocationType == "" {
+		invocationType = "RequestResponse" // Default to sync
 	}
 
 	inputBytes, _ := json.Marshal(input)
-	ack, err := h.service.ExecuteJob(r.Context(), lambdaID, string(inputBytes))
+	
+	if invocationType == "Event" {
+		// Async execution (AWS Lambda 'Event' type)
+		ack, err := h.service.ExecuteJob(r.Context(), lambdaID, string(inputBytes))
+		if err != nil {
+			writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]interface{}{
+			"status":       "Execution requested",
+			"acknowledged": ack,
+		})
+		return
+	}
+
+	// Sync execution (AWS Lambda 'RequestResponse' type)
+	resp, err := h.service.TriggerLambda(r.Context(), &domain.LambdaExecRequest{
+		ReferenceID: lambdaID,
+		Input:       input,
+	})
 	if err != nil {
 		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
 		return
 	}
 
-	writeJSON(w, http.StatusAccepted, map[string]interface{}{
-		"status":       "Execution requested",
-		"acknowledged": ack,
-	})
+	// For now, TriggerLambda is async. We will soon upgrade it to wait for result.
+	// But let's keep the DTO consistent.
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // List all lambdas for the authenticated user

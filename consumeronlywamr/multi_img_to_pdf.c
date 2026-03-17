@@ -1,15 +1,66 @@
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+
+/* --- Custom minimal libc replacements --- */
+static void my_memcpy(uint8_t *dst, const uint8_t *src, int len) {
+  for (int i = 0; i < len; i++) {
+    dst[i] = src[i];
+  }
+}
+
+static int my_strlen(const char *s) {
+  int n = 0;
+  while (s[n])
+    n++;
+  return n;
+}
+
+static void itoa_fixed(int val, char *buf, int width, int pad_zero) {
+    if (val == 0) {
+        if (width <= 0) width = 1;
+        for (int i = 0; i < width - 1; i++) buf[i] = pad_zero ? '0' : ' ';
+        buf[width - 1] = '0';
+        buf[width] = '\0';
+        return;
+    }
+    
+    char temp[32];
+    int i = 0;
+    while (val > 0) {
+        temp[i++] = '0' + (val % 10);
+        val /= 10;
+    }
+    
+    int padding = width - i;
+    if (padding < 0) padding = 0;
+    
+    int b = 0;
+    for (int p = 0; p < padding; p++) {
+        buf[b++] = pad_zero ? '0' : ' ';
+    }
+    
+    for (int j = i - 1; j >= 0; j--) {
+        buf[b++] = temp[j];
+    }
+    buf[b] = '\0';
+}
 
 /* Helper to append strings safely */
 static void append_str(uint8_t *buf, int *pos, const char *str) {
-  int len = strlen(str);
-  memcpy(buf + *pos, str, len);
+  int len = my_strlen(str);
+  my_memcpy(buf + *pos, (const uint8_t*)str, len);
   *pos += len;
 }
 
-/* Parse JPEG header to find width and height natively in C */
+static void append_int(uint8_t *buf, int *pos, int val, int width, int pad_zero) {
+    char temp[32];
+    itoa_fixed(val, temp, width, pad_zero);
+    append_str(buf, pos, temp);
+}
+
+static void append_obj_start(uint8_t *buf, int *pos, int id) {
+    append_int(buf, pos, id, 0, 0);
+    append_str(buf, pos, " 0 obj\n");
+}
 static int get_jpeg_dimensions(const uint8_t *data, int size, int *width,
                                int *height) {
   int pos = 0;
@@ -87,13 +138,14 @@ invoke(uint8_t *input_ptr, int input_size, uint8_t *output_ptr,
   // Calculate the IDs of the Page objects beforehand
   int current_obj_id = pages_id + 1;
   for (int i = 0; i < num_images; i++) {
-    snprintf(temp, sizeof(temp), "%d 0 R ", current_obj_id);
-    append_str(output_ptr, &pos, temp);
+    append_int(output_ptr, &pos, current_obj_id, 0, 0);
+    append_str(output_ptr, &pos, " 0 R ");
     current_obj_id += 3; // Each page uses 3 objects (Page, Image, Content)
   }
 
-  snprintf(temp, sizeof(temp), "] /Count %d >>\nendobj\n", num_images);
-  append_str(output_ptr, &pos, temp);
+  append_str(output_ptr, &pos, "] /Count ");
+  append_int(output_ptr, &pos, num_images, 0, 0);
+  append_str(output_ptr, &pos, " >>\nendobj\n");
 
   // Parse payload and create pages
   int input_pos = 4;
@@ -128,56 +180,76 @@ invoke(uint8_t *input_ptr, int input_size, uint8_t *output_ptr,
 
     // --- Object 1: Page ---
     xref_offsets[page_id] = pos;
-    snprintf(temp, sizeof(temp),
-             "%d 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %d %d] "
-             "/Resources << /XObject << /I1 %d 0 R >> >> /Contents %d 0 R "
-             ">>\nendobj\n",
-             page_id, width, height, img_id, content_id);
-    append_str(output_ptr, &pos, temp);
+    append_obj_start(output_ptr, &pos, page_id);
+    append_str(output_ptr, &pos, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ");
+    append_int(output_ptr, &pos, width, 0, 0);
+    append_str(output_ptr, &pos, " ");
+    append_int(output_ptr, &pos, height, 0, 0);
+    append_str(output_ptr, &pos, "] /Resources << /XObject << /I1 ");
+    append_int(output_ptr, &pos, img_id, 0, 0);
+    append_str(output_ptr, &pos, " 0 R >> >> /Contents ");
+    append_int(output_ptr, &pos, content_id, 0, 0);
+    append_str(output_ptr, &pos, " 0 R >>\nendobj\n");
 
     // --- Object 2: Image XObject ---
     xref_offsets[img_id] = pos;
-    snprintf(temp, sizeof(temp),
-             "%d 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d "
-             "/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode "
-             "/Length %d >>\nstream\n",
-             img_id, width, height, img_size);
-    append_str(output_ptr, &pos, temp);
+    append_obj_start(output_ptr, &pos, img_id);
+    append_str(output_ptr, &pos, "<< /Type /XObject /Subtype /Image /Width ");
+    append_int(output_ptr, &pos, width, 0, 0);
+    append_str(output_ptr, &pos, " /Height ");
+    append_int(output_ptr, &pos, height, 0, 0);
+    append_str(output_ptr, &pos, " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ");
+    append_int(output_ptr, &pos, img_size, 0, 0);
+    append_str(output_ptr, &pos, " >>\nstream\n");
 
     // Embed JPEG bytes
     if (pos + img_size > output_capacity)
       return -2; // Check bounds
-    memcpy(output_ptr + pos, img_data, img_size);
+    my_memcpy(output_ptr + pos, img_data, img_size);
     pos += img_size;
     append_str(output_ptr, &pos, "\nendstream\nendobj\n");
 
     // --- Object 3: Content stream ---
     xref_offsets[content_id] = pos;
-    snprintf(temp, sizeof(temp), "q %d 0 0 %d 0 0 cm /I1 Do Q", width, height);
-    int content_len = strlen(temp);
+    
+    char content_buf[64];
+    int c_pos = 0;
+    append_str((uint8_t*)content_buf, &c_pos, "q ");
+    append_int((uint8_t*)content_buf, &c_pos, width, 0, 0);
+    append_str((uint8_t*)content_buf, &c_pos, " 0 0 ");
+    append_int((uint8_t*)content_buf, &c_pos, height, 0, 0);
+    append_str((uint8_t*)content_buf, &c_pos, " 0 0 cm /I1 Do Q");
+    int content_len = c_pos; // the length of the stream string
 
-    char temp2[256];
-    snprintf(temp2, sizeof(temp2),
-             "%d 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n",
-             content_id, content_len, temp);
-    append_str(output_ptr, &pos, temp2);
+    append_obj_start(output_ptr, &pos, content_id);
+    append_str(output_ptr, &pos, "<< /Length ");
+    append_int(output_ptr, &pos, content_len, 0, 0);
+    append_str(output_ptr, &pos, " >>\nstream\n");
+    
+    // Directly copy the created content_buf
+    my_memcpy(output_ptr + pos, (const uint8_t*)content_buf, content_len);
+    pos += content_len;
+    
+    append_str(output_ptr, &pos, "\nendstream\nendobj\n");
   }
 
   // --- XRef table ---
   int xref = pos;
-  snprintf(temp, sizeof(temp), "xref\n0 %d\n0000000000 65535 f \n", obj_id);
-  append_str(output_ptr, &pos, temp);
+  append_str(output_ptr, &pos, "xref\n0 ");
+  append_int(output_ptr, &pos, obj_id, 0, 0);
+  append_str(output_ptr, &pos, "\n0000000000 65535 f \n");
 
   for (int i = 1; i < obj_id; i++) {
-    snprintf(temp, sizeof(temp), "%010d 00000 n \n", xref_offsets[i]);
-    append_str(output_ptr, &pos, temp);
+    append_int(output_ptr, &pos, xref_offsets[i], 10, 1);
+    append_str(output_ptr, &pos, " 00000 n \n");
   }
 
   // --- Trailer ---
-  snprintf(temp, sizeof(temp),
-           "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%EOF\n",
-           obj_id, xref);
-  append_str(output_ptr, &pos, temp);
+  append_str(output_ptr, &pos, "trailer\n<< /Size ");
+  append_int(output_ptr, &pos, obj_id, 0, 0);
+  append_str(output_ptr, &pos, " /Root 1 0 R >>\nstartxref\n");
+  append_int(output_ptr, &pos, xref, 0, 0);
+  append_str(output_ptr, &pos, "\n%%EOF\n");
 
   if (pos > output_capacity)
     return -2;

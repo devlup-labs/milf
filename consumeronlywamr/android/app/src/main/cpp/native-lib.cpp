@@ -586,3 +586,145 @@ cleanup:
 
   return resultByteArray;
 }
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_consumeronlywamr_WasmService_invokeWasmString(
+    JNIEnv *env, jobject, jbyteArray wasmBytes, jstring funcName,
+    jstring payload) {
+    
+  const char *nativeFuncName = env->GetStringUTFChars(funcName, NULL);
+  const char *nativePayload = env->GetStringUTFChars(payload, NULL);
+  
+  char *buffer = NULL;
+  char error_buf[128];
+  wasm_module_t module = NULL;
+  wasm_module_inst_t module_inst = NULL;
+  wasm_exec_env_t exec_env = NULL;
+  jstring resultString = NULL;
+
+  // 1. Load Bytes
+  jsize length = env->GetArrayLength(wasmBytes);
+  buffer = (char *)malloc(length);
+  if (!buffer) {
+    LOGE("Failed to allocate buffer");
+    resultString = env->NewStringUTF("Error: JNI Memory allocation failed");
+    goto cleanup_string;
+  }
+  env->GetByteArrayRegion(wasmBytes, 0, length, (jbyte *)buffer);
+
+  // 2. Load Module
+  module = wasm_runtime_load((uint8_t *)buffer, length, error_buf, sizeof(error_buf));
+  if (!module) {
+    LOGE("Load failed: %s", error_buf);
+    std::string err_msg = "Error: WASM Load failed: " + std::string(error_buf);
+    resultString = env->NewStringUTF(err_msg.c_str());
+    goto cleanup_string;
+  }
+
+  // Set WASI parameters
+  wasm_runtime_set_wasi_args(module, NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+
+  // 3. Instantiate with a reasonable heap size (32MB) for JSON processing
+  module_inst = wasm_runtime_instantiate(module, 16384, 32 * 1024 * 1024, error_buf, sizeof(error_buf));
+  if (!module_inst) {
+    LOGE("Instantiation failed: %s", error_buf);
+    std::string err_msg = "Error: WASM Instantiation failed: " + std::string(error_buf);
+    resultString = env->NewStringUTF(err_msg.c_str());
+    goto cleanup_string;
+  }
+
+  // 4. Create Exec Env
+  exec_env = wasm_runtime_create_exec_env(module_inst, 16384);
+  if (!exec_env) {
+    LOGE("Exec env creation failed");
+    resultString = env->NewStringUTF("Error: WASM Exec env creation failed");
+    goto cleanup_string;
+  }
+
+  // 5. Dynamic Lookup for universal invoke
+  {
+    wasm_function_inst_t func = wasm_runtime_lookup_function(module_inst, nativeFuncName);
+    if (!func && strcmp(nativeFuncName, "wasm_main") != 0) {
+      func = wasm_runtime_lookup_function(module_inst, "wasm_main");
+    }
+    if (!func) {
+      func = wasm_runtime_lookup_function(module_inst, "main");
+    }
+    if (!func) {
+      LOGE("Function '%s' (or wasm_main/main) not found in WASM module", nativeFuncName);
+      resultString = env->NewStringUTF("Error: Function not found");
+      goto cleanup_string;
+    }
+
+    uint32_t payload_len = strlen(nativePayload);
+    // Add +1 for null terminator just in case C code uses string functions
+    uint32_t in_size = payload_len + 1; 
+    
+    void *native_in_ptr = NULL;
+    uint32_t in_ptr = wasm_runtime_module_malloc(module_inst, in_size, &native_in_ptr);
+    
+    if (!in_ptr || !native_in_ptr) {
+      LOGE("Failed to allocate input memory in WASM (size: %d). Does module export malloc?", in_size);
+      resultString = env->NewStringUTF("Error: WASM Memory allocation failed");
+      goto cleanup_string;
+    }
+
+    // copy string to WASM memory
+    memcpy(native_in_ptr, nativePayload, in_size);
+
+    uint32_t out_capacity = 2 * 1024 * 1024; // 2 MB maximum output string size
+    void *native_out_ptr = NULL;
+    uint32_t out_ptr = wasm_runtime_module_malloc(module_inst, out_capacity, &native_out_ptr);
+    
+    if (!out_ptr || !native_out_ptr) {
+      LOGE("Failed to allocate output memory in WASM");
+      wasm_runtime_module_free(module_inst, in_ptr);
+      resultString = env->NewStringUTF("Error: WASM Output Memory allocation failed");
+      goto cleanup_string;
+    }
+
+    // C function signature: int wasm_main(char* payload, int payload_len, char* out_buf, int out_max)
+    uint32_t argv[4];
+    argv[0] = in_ptr;
+    argv[1] = payload_len; // Exact length without null term usually passed
+    argv[2] = out_ptr;
+    argv[3] = out_capacity;
+
+    if (wasm_runtime_call_wasm(exec_env, func, 4, argv)) {
+      int out_size = (int)argv[0];
+      LOGI("invokeWasmString executed. Returned size: %d", out_size);
+      
+      if (out_size >= 0 && out_size < out_capacity) {
+        // Null terminate mathematically just to be safe before creating Java String
+        ((char*)native_out_ptr)[out_size] = '\0';
+        resultString = env->NewStringUTF((const char *)native_out_ptr);
+      } else {
+        LOGE("invokeWasmString returned invalid size: %d (capacity: %d)", out_size, out_capacity);
+        resultString = env->NewStringUTF("Error: WASM returned invalid size or overflowed");
+      }
+    } else {
+        const char* exception = wasm_runtime_get_exception(module_inst);
+        LOGE("Execution failed: %s", exception);
+        std::string err_str = "Error: WASM Exception: " + std::string(exception ? exception : "unknown");
+        resultString = env->NewStringUTF(err_str.c_str());
+    }
+
+    wasm_runtime_module_free(module_inst, in_ptr);
+    wasm_runtime_module_free(module_inst, out_ptr);
+  }
+
+cleanup_string:
+  if (exec_env) wasm_runtime_destroy_exec_env(exec_env);
+  if (module_inst) wasm_runtime_deinstantiate(module_inst);
+  if (module) wasm_runtime_unload(module);
+  if (buffer) free(buffer);
+
+  env->ReleaseStringUTFChars(funcName, nativeFuncName);
+  env->ReleaseStringUTFChars(payload, nativePayload);
+
+  if (resultString == NULL) {
+      resultString = env->NewStringUTF("Error: Unknown failure");
+  }
+
+  return resultString;
+}

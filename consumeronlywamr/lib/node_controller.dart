@@ -169,39 +169,38 @@ class NodeController extends ChangeNotifier {
           : <String, dynamic>{};
 
       if (paramPayload.isNotEmpty) {
-        // Try to extract all values as integers for the int-array path
+        // Check if ANY parameter requires string/complex data type handling
+        bool hasComplexTypes = false;
         final List<int> intArgs = [];
-        bool allInts = true;
+        
         for (final value in paramPayload.values) {
           if (value is int) {
             intArgs.add(value);
           } else if (value is num) {
             intArgs.add(value.toInt());
           } else {
-            final parsed = int.tryParse(value.toString());
-            if (parsed != null) {
-              intArgs.add(parsed);
-            } else {
-              allInts = false;
-              break;
-            }
+            // Any string, object, array, or boolean triggers complex mode
+            hasComplexTypes = true;
+            break;
           }
         }
 
-        if (allInts && intArgs.isNotEmpty) {
+        if (hasComplexTypes) {
+          // Serialize the whole payload mapping for the C string interface
+          final stringPayload = jsonEncode(paramPayload);
+          _log('String/JSON task → $funcName Payload: $stringPayload');
+          methodCall = _platform.invokeMethod('invokeWasmString', {
+            'bytes': wasmBytes,
+            'funcName': funcName,
+            'payload': stringPayload,
+          });
+        } else {
+          // Pure integer function (original fast path)
           _log('Int-args task (${intArgs.length} params): $intArgs → $funcName');
           methodCall = _platform.invokeMethod('invokeWasm', {
             'bytes': wasmBytes,
             'funcName': funcName,
             'args': Int32List.fromList(intArgs),
-          });
-        } else {
-          // Has non-integer values → use binary data path
-          _log('Data task → $funcName (non-int values detected)');
-          methodCall = _platform.invokeMethod('invokeDataWasm', {
-            'bytes': wasmBytes,
-            'funcName': funcName,
-            'payload': payload,
           });
         }
       } else {

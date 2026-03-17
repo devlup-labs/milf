@@ -20,6 +20,11 @@ interface WasmServiceInterface {
     int wasmAdd(in byte[] wasmBytes, int a, int b);
 
     /**
+     * Executes a WASM function by allocating memory, passing a string/json payload, and reading the string result.
+     */
+    String invokeWasmString(in byte[] wasmBytes, String funcName, String payload);
+
+    /**
      * Universal Dispatcher for input using ABI Pattern:
      * Passes a byte payload into WASM linear memory and expects a byte array back.
      */

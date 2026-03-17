@@ -40,6 +40,9 @@ func (r *Router) Setup() http.Handler {
 	r.mux.HandleFunc("POST /api/v1/lambdas/trigger", wrap(r.handler.Trigger))
 	r.mux.HandleFunc("POST /api/v1/lambdas/activate", wrap(r.handler.Activate))
 	r.mux.HandleFunc("POST /api/v1/execute/{id}", wrap(r.handler.Execute))
+	r.mux.HandleFunc("GET /ping", func(w http.ResponseWriter, req *http.Request) {
+		w.Write([]byte("pong"))
+	})
 	r.mux.HandleFunc("GET /api/v1/executions/{id}", wrap(r.handler.GetExecution))
 
 	// Compat (legacy client) APIs

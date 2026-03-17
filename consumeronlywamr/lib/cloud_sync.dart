@@ -81,7 +81,7 @@ class CloudSync {
         Uri.parse('$serverUrl/api/v1/sinks/register'),
         headers: headers,
         body: jsonEncode({
-          'email': 'node_${DateTime.now().millisecondsSinceEpoch}@milf.local',
+          'email': 'node_primary@milf.local',
           'password': 'unused',
           'endpoint': 'ws-node',
         }),

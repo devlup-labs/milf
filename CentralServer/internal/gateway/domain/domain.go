@@ -59,9 +59,10 @@ type Lambda struct {
 	Runtime    RuntimeEnvironment `json:"runtime"`
 	MemoryMB   int                `json:"memory_mb"`
 	RunType    RunType            `json:"run_type"`
-	WasmRef    string             `json:"wasm_ref"`
-	Status     string             `json:"status"`
-	CreatedAt  time.Time          `json:"created_at"`
+	WasmRef        string             `json:"wasm_ref"`
+	Status         string             `json:"status"`
+	CronExpression string             `json:"cron_expression,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
 	UpdatedAt  time.Time          `json:"updated_at"`
 }
 
@@ -136,8 +137,9 @@ type LambdaStoreRequest struct {
 	SourceCode []byte             `json:"source_code"`
 	Runtime    RuntimeEnvironment `json:"runtime"`
 	MemoryMB   int                `json:"memory_mb"`
-	RunType    RunType            `json:"run_type"`
-	MetaData   map[string]string  `json:"metadata,omitempty"`
+	RunType        RunType            `json:"run_type"`
+	CronExpression string             `json:"cron_expression,omitempty"`
+	MetaData       map[string]string  `json:"metadata,omitempty"`
 }
 
 type LambdaStoreResponse struct {

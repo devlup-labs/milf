@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,6 +20,14 @@ type LambdaService struct {
 	orchestrator  interfaces.OrchestratorService
 	compilerQueue *domain.CompilationQueue
 	executionRepo interfaces.ExecutionRepository
+	scheduler     *Scheduler // Added for Phase 2
+
+	// Registry for Synchronous Execution (RequestResponse mode)
+	resultWaiters sync.Map // map[executionID]chan *domain.Execution
+}
+
+func (s *LambdaService) SetScheduler(sch *Scheduler) {
+	s.scheduler = sch
 }
 
 func NewLambdaService(
@@ -76,22 +85,70 @@ func (s *LambdaService) TriggerLambda(ctx context.Context, req *domain.LambdaExe
 		}
 	}
 
+	// Create a listener channel for synchronous execution
+	resultChan := make(chan *domain.Execution, 1)
+	s.resultWaiters.Store(trigID, resultChan)
+	defer s.resultWaiters.Delete(trigID)
+
 	inputBytes, _ := json.Marshal(req.Input)
 	ack, err := s.SendTriggerWithID(ctx, trigID, req.ReferenceID, string(inputBytes))
 	if err != nil {
 		return nil, err
 	}
 
-	status := domain.ExecutionStatusPending
-	if ack {
-		status = domain.ExecutionStatusRunning
+	if !ack {
+		return &domain.LambdaExecResponse{
+			ExecutionID: trigID,
+			Status:      domain.ExecutionStatusPending,
+			Message:     "Trigger failed (no sinks available or rejected)",
+		}, nil
 	}
 
-	return &domain.LambdaExecResponse{
-		ExecutionID: trigID,
-		Status:      status,
-		Message:     "Trigger sent",
-	}, nil
+	// Wait for the result with a timeout (e.g., 30 seconds)
+	select {
+	case result := <-resultChan:
+		return &domain.LambdaExecResponse{
+			ExecutionID: trigID,
+			Status:      result.Status,
+			Result:      result.Output,
+			Message:     "Execution completed",
+		}, nil
+	case <-time.After(30 * time.Second):
+		return &domain.LambdaExecResponse{
+			ExecutionID: trigID,
+			Status:      domain.ExecutionStatusPending,
+			Message:     "Execution timed out on worker",
+		}, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// NotifyResult is called by the system when a WASM result is received.
+func (s *LambdaService) NotifyResult(ctx context.Context, executionID string, output interface{}, execErr error) {
+	status := domain.ExecutionStatusCompleted
+	errMsg := ""
+	if execErr != nil {
+		status = domain.ExecutionStatusFailed
+		errMsg = execErr.Error()
+	}
+
+	// Update DB record
+	if s.executionRepo != nil {
+		_ = s.executionRepo.UpdateStatus(ctx, executionID, status, output, errMsg)
+	}
+
+	// Notify waiting HTTP goroutine if any
+	if waiter, ok := s.resultWaiters.Load(executionID); ok {
+		if ch, ok := waiter.(chan *domain.Execution); ok {
+			ch <- &domain.Execution{
+				ID:     executionID,
+				Status: status,
+				Output: output,
+				Error:  errMsg,
+			}
+		}
+	}
 }
 
 // ActivateLambda implements domain.LambdaService
@@ -167,8 +224,9 @@ func (s *LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaSto
 		SourceCode: req.SourceCode,
 		Runtime:    req.Runtime,
 		MemoryMB:   req.MemoryMB,
-		RunType:    req.RunType,
-		Status:     "uncompiled",
+		RunType:        req.RunType,
+		CronExpression: req.CronExpression,
+		Status:         "uncompiled",
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -180,6 +238,11 @@ func (s *LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaSto
 		return false, domain.ErrInternalServer
 	}
 	utils.Info(fmt.Sprintf("[Gateway] Lambda %s saved to DB successfully", req.FuncID))
+	
+	// Phase 2: Notify scheduler if it's a periodic job
+	if s.scheduler != nil && req.RunType == domain.RunTypePeriodic {
+		go s.scheduler.SyncJobs(context.Background())
+	}
 
 	if s.compilerQueue.JobsMap[req.FuncID] != nil {
 		utils.Info(fmt.Sprintf("[Gateway] Job for %s already exists in queue, skipping enqueue", req.FuncID))

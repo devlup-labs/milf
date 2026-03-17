@@ -47,12 +47,23 @@ export default function CreateFunction() {
     name: "",
     sourceType: "inline",
     code: `#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
 
-// Export the function — this is what the WASM runtime will call.
-// Parameters become the user-provided inputs at invocation time.
+// Export the function - this is what the WASM runtime will call.
+// For complex data types (JSON/Strings), use this exact signature.
 __attribute__((visibility("default"))) __attribute__((used))
-int wasm_main(int a, int b) {
-  return a + b;
+int wasm_main(char* payload, int payload_len, char* out_buf, int out_max) {
+  
+  if (payload_len == 0) {
+      const char* err = "{\\"error\\": \\"Empty payload\\"}";
+      strncpy(out_buf, err, out_max);
+      return strlen(err);
+  }
+
+  // Example: Echo the input back inside a JSON envelope
+  int written = snprintf(out_buf, out_max, "{ \\"echo\\": %s, \\"status\\": \\"success\\" }", payload);
+  return (written >= out_max) ? out_max - 1 : written;
 }
 `,
     runtime: "c",

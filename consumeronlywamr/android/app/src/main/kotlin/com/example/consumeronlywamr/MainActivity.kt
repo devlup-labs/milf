@@ -79,6 +79,29 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGS", "Missing arguments for invokeWasm", null)
                     }
                 }
+                "invokeWasmString" -> {
+                    val bytes = call.argument<ByteArray>("bytes")
+                    val func = call.argument<String>("funcName")
+                    val payload = call.argument<String>("payload")
+
+                    if (bytes != null &&
+                        func != null &&
+                        payload != null &&
+                        isBound &&
+                        wasmService != null
+                    ) {
+                        Executors.newSingleThreadExecutor().execute {
+                            try {
+                                val res = wasmService?.invokeWasmString(bytes, func, payload)
+                                runOnUiThread { result.success(res) }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("INVOKE_STRING_ERROR", e.toString(), null) }
+                            }
+                        }
+                    } else {
+                        result.error("INVALID_ARGS", "Missing arguments for invokeWasmString", null)
+                    }
+                }
                 "invokeDataWasm" -> {
                     val bytes = call.argument<ByteArray>("bytes")
                     val func = call.argument<String>("funcName") // TODO: think about the convinient way for this or can be use something as lambda_handler

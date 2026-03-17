@@ -26,13 +26,20 @@ import (
 	sinkhandler "central_server/internal/sinkManager/handler"
 	sinkinterfaces "central_server/internal/sinkManager/interfaces"
 	"central_server/internal/storage"
+	"central_server/utils"
 )
 
 func main() {
 	ctx := context.Background()
 
+	// Setup logging to file and stdout
+	logFile, _ := os.OpenFile("/tmp/milf_server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	log.SetOutput(logFile)
+	utils.Logger.SetOutput(logFile) // Added this line
+	log.Printf("[Main] Server starting...")
+
 	// Load .env file
-	godotenv.Load(".env")
+	godotenv.Overload(".env")
 
 	// Load database configuration from environment variables
 	dbHost := os.Getenv("DB_HOST")
@@ -103,11 +110,21 @@ func main() {
 	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue, executionRepo)
 	orchestrator := orchcore.NewOrchestrator(functionRepo, lambdaService, queueService)
 	compiler := compilercore.NewCompiler(objectStore, trigger, compQueue, orchestrator)
-	compiler.SetClangPath(os.Getenv("CLANG_PATH"))
+	clangPath := os.Getenv("CLANG_PATH")
+	log.Printf("[Main] Using CLANG_PATH from env: %s", clangPath)
+	if _, err := os.Stat(clangPath); os.IsNotExist(err) {
+		log.Printf("[CRITICAL] Clang binary NOT FOUND at %s. Compilation will fail.", clangPath)
+	}
+	compiler.SetClangPath(clangPath)
 	go compiler.Start(ctx)
 
 	// 4. Wire Circular Dependencies
 	lambdaService.SetOrchestrator(orchestrator)
+
+	// 4.5 Start Scheduler (Phase 2: Event-Driven)
+	scheduler := gwcore.NewScheduler(functionRepo, orchestrator)
+	lambdaService.SetScheduler(scheduler)
+	go scheduler.Start(ctx)
 
 	// 5. Handlers & Routers
 	lambdaHandler := gwhandler.NewLambdaHandler(lambdaService)
@@ -121,16 +138,10 @@ func main() {
 
 	// QueueService - already created above
 
-	// ResultCallback: when Android returns a result, update the executionRepo
-	// so the frontend's polling GET /api/v1/executions/{id} sees the final status.
+	// ResultCallback: when Android returns a result, notify the lambdaService
+	// so that synchronous HTTP requests (TriggerLambda) can unblock.
 	resultCallback := func(ctx context.Context, executionID string, result interface{}, execErr error) {
-		if execErr != nil {
-			log.Printf("[WorkManager] ✗ Execution %s FAILED on worker: %v", executionID, execErr)
-			_ = executionRepo.UpdateStatus(ctx, executionID, domain.ExecutionStatusFailed, nil, execErr.Error())
-		} else {
-			log.Printf("[WorkManager] ✔ Execution %s COMPLETED — output: %v", executionID, result)
-			_ = executionRepo.UpdateStatus(ctx, executionID, domain.ExecutionStatusCompleted, result, "")
-		}
+		lambdaService.NotifyResult(ctx, executionID, result, execErr)
 	}
 
 	sinkService := sinkcore.NewSinkManagerService(sinkRepo, taskRepo, resultRepo, sinkClient, queueService, resultCallback, jwtSecret)
@@ -216,19 +227,15 @@ func main() {
 
 	// Mount gateway routes
 	gatewayMux := gatewayRouter.Setup()
-	mux.Handle("/api/v1/lambdas", gatewayMux)
-	mux.Handle("/api/v1/lambdas/", gatewayMux)
-	mux.Handle("/api/v1/executions/", gatewayMux)
-	mux.Handle("/health", gatewayMux)
+	mux.Handle("/api/v1/", gatewayMux)
 
-	mux.Handle("/functions", gatewayMux)
-	mux.Handle("/functions/", gatewayMux)
-	mux.Handle("/invocations", gatewayMux)
+	// Direct mount for execution and simulations (Phase 1)
+	mux.Handle("POST /api/v1/execute/{id}", authHandler.AuthMiddleware(http.HandlerFunc(lambdaHandler.Execute)))
 
 	// Mount sink manager routes
 	sinkMux := sinkRouter.Setup()
-	mux.Handle("/api/v1/sinks", sinkMux)
 	mux.Handle("/api/v1/sinks/", sinkMux)
+	mux.Handle("/api/v1/sinks", sinkMux)
 	mux.Handle("/api/v1/tasks/", sinkMux)
 
 	addr := ":8080"

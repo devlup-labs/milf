@@ -62,6 +62,23 @@ set(WAMR_CORE_SRC ${COMMON_SRC} ${INTERP_SRC} ${OTHER_SRC} ${WASI_SRC})
 
 # Filter out unrelated platform files if GLOB picks up too much (optional, but safe for now)
 
+# Global definitions for all files MUST BE BEFORE add_library
+add_definitions(
+    -DWASM_ENABLE_INTERP=1
+    -DWASM_ENABLE_AOT=0
+    -DWASM_ENABLE_JIT=0
+    -DWASM_ENABLE_LIBC_BUILTIN=1
+    -DWASM_ENABLE_FAST_JIT=0
+    -DWASM_ENABLE_FAST_INTERP=1
+    -DWASM_ENABLE_LIBC_WASI=1
+    -DWASM_ENABLE_MODULE_INST_CONTEXT=1
+    -DBH_PLATFORM_ANDROID=1
+    -DBH_MALLOC=wasm_runtime_malloc
+    -DBH_FREE=wasm_runtime_free
+    -DWASM_HAVE_MREMAP=1
+    -DWASM_ENABLE_BULK_MEMORY=1
+)
+
 add_library(
         native-lib
         SHARED
@@ -83,23 +100,4 @@ target_link_libraries(
         dl # Dynamic linking library
 )
 
-# Global definitions for all files
-add_definitions(
-    -DWASM_ENABLE_INTERP=1
-    -DWASM_ENABLE_AOT=0
-    -DWASM_ENABLE_JIT=0
-    -DWASM_ENABLE_LIBC_BUILTIN=1
-    -DWASM_ENABLE_FAST_JIT=0
-    -DWASM_ENABLE_FAST_INTERP=1
-    -DWASM_ENABLE_LIBC_WASI=1
-    -DWASM_ENABLE_MODULE_INST_CONTEXT=1
-    -DBH_PLATFORM_ANDROID=1
-    -DBH_MALLOC=wasm_runtime_malloc
-    -DBH_FREE=wasm_runtime_free
-    -DWASM_HAVE_MREMAP=1
-    -DWASM_ENABLE_BULK_MEMORY=1
-)
-
-target_compile_definitions(native-lib PRIVATE
-    # Any lib-specific flags here if needed
-)
+# target_compile_definitions removed, handled above
