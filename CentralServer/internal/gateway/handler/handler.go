@@ -298,3 +298,92 @@ func (h *LambdaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		"id":      lambdaID,
 	})
 }
+
+// PauseSchedule pauses a lambda's cron schedule
+func (h *LambdaHandler) PauseSchedule(w http.ResponseWriter, r *http.Request) {
+	lambdaID := r.PathValue("id")
+	if lambdaID == "" {
+		writeError(w, http.StatusBadRequest, "Lambda ID is required", "")
+		return
+	}
+
+	ok, err := h.service.PauseSchedule(r.Context(), lambdaID)
+	if err != nil {
+		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Schedule paused",
+		"id":      lambdaID,
+		"paused":  ok,
+	})
+}
+
+// ResumeSchedule resumes a lambda's cron schedule
+func (h *LambdaHandler) ResumeSchedule(w http.ResponseWriter, r *http.Request) {
+	lambdaID := r.PathValue("id")
+	if lambdaID == "" {
+		writeError(w, http.StatusBadRequest, "Lambda ID is required", "")
+		return
+	}
+
+	ok, err := h.service.ResumeSchedule(r.Context(), lambdaID)
+	if err != nil {
+		writeError(w, mapErrorToHTTPStatus(err), err.Error(), "")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Schedule resumed",
+		"id":      lambdaID,
+		"resumed": ok,
+	})
+}
+
+// GetScheduleStatus returns whether a function's schedule is paused
+func (h *LambdaHandler) GetScheduleStatus(w http.ResponseWriter, r *http.Request) {
+	lambdaID := r.PathValue("id")
+	if lambdaID == "" {
+		writeError(w, http.StatusBadRequest, "Lambda ID is required", "")
+		return
+	}
+
+	paused := h.service.IsSchedulePaused(r.Context(), lambdaID)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"id":     lambdaID,
+		"paused": paused,
+	})
+}
+
+// ListLogs returns log entries for the authenticated user
+func (h *LambdaHandler) ListLogs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := authdomain.UserIDFromContext(r.Context())
+	if !ok {
+		userID = ""
+	}
+
+	level := r.URL.Query().Get("level")
+	limitStr := r.URL.Query().Get("limit")
+	limit := 100
+	if limitStr != "" {
+		if n := 0; len(limitStr) > 0 {
+			for _, ch := range limitStr {
+				if ch >= '0' && ch <= '9' {
+					n = n*10 + int(ch-'0')
+				}
+			}
+			if n > 0 {
+				limit = n
+			}
+		}
+	}
+
+	logs, err := h.service.ListLogs(r.Context(), userID, level, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error(), "")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, logs)
+}

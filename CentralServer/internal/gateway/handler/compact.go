@@ -74,11 +74,13 @@ func (h *CompatHandler) Invoke(w http.ResponseWriter, r *http.Request) {
 func (h *CompatHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// What the client sends (simplified mockApi shape)
 	var req struct {
-		Name       string                 `json:"name"`
-		Runtime    string                 `json:"runtime"`
-		Memory     int                    `json:"memory"`
-		SourceCode string                 `json:"sourceCode"`
-		MetaData   map[string]string      `json:"metadata,omitempty"`
+		Name           string                 `json:"name"`
+		Runtime        string                 `json:"runtime"`
+		Memory         int                    `json:"memory"`
+		SourceCode     string                 `json:"sourceCode"`
+		RunType        string                 `json:"run_type,omitempty"`
+		CronExpression string                 `json:"cron_expression,omitempty"`
+		MetaData       map[string]string      `json:"metadata,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -93,14 +95,21 @@ func (h *CompatHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default run type to on_command if not specified
+	runType := domain.RunType(req.RunType)
+	if runType == "" {
+		runType = domain.RunTypeOnCommand
+	}
+
 	storeReq := &domain.LambdaStoreRequest{
-		UserID:     userID,
-		FuncID:     req.Name,
-		SourceCode: []byte(req.SourceCode),
-		Runtime:    domain.RuntimeEnvironment(req.Runtime),
-		MemoryMB:   req.Memory,
-		RunType:    domain.RunTypeOnCommand,
-		MetaData:   req.MetaData,
+		UserID:         userID,
+		FuncID:         req.Name,
+		SourceCode:     []byte(req.SourceCode),
+		Runtime:        domain.RuntimeEnvironment(req.Runtime),
+		MemoryMB:       req.Memory,
+		RunType:        runType,
+		CronExpression: req.CronExpression,
+		MetaData:       req.MetaData,
 	}
 
 	resp, err := h.lambdaService.StoreLambda(r.Context(), storeReq)

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -34,8 +35,11 @@ func main() {
 
 	// Setup logging to file and stdout
 	logFile, _ := os.OpenFile("/tmp/milf_server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	log.SetOutput(logFile)
-	utils.Logger.SetOutput(logFile) // Added this line
+	multi := io.MultiWriter(os.Stdout, logFile)
+	log.SetOutput(multi)
+	if utils.Logger != nil {
+		utils.Logger.SetOutput(multi)
+	}
 	log.Printf("[Main] Server starting...")
 
 	// Load .env file
@@ -125,6 +129,10 @@ func main() {
 	scheduler := gwcore.NewScheduler(functionRepo, orchestrator)
 	lambdaService.SetScheduler(scheduler)
 	go scheduler.Start(ctx)
+
+	// 4.6 Wire Log Repository (Phase 4: Observability)
+	logRepo := storage.NewPostgresLogRepo(userRepo.GetDB())
+	lambdaService.SetLogRepo(logRepo)
 
 	// 5. Handlers & Routers
 	lambdaHandler := gwhandler.NewLambdaHandler(lambdaService)

@@ -19,7 +19,7 @@ const navItems = [
   { to: "/functions", icon: Zap, label: "Functions" },
   { to: "/files", icon: FolderOpen, label: "Files" },
   { to: "/invocations", icon: Activity, label: "Invocations" },
-  { to: "/logs", icon: ScrollText, label: "Logs" },
+  { to: "/logs", icon: ScrollText, label: "Logs", badge: "NEW" },
   { to: "/billing", icon: CreditCard, label: "Billing" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
@@ -53,7 +53,16 @@ export function LeftSidebar() {
                 )}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && (
+                  <div className="flex-1 flex items-center justify-between">
+                    <span>{item.label}</span>
+                    {item.badge && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/20 text-primary border border-primary/20 leading-none">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                )}
               </NavLink>
             );
           })}

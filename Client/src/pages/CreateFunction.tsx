@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload, FileCode, Container, FileUp, FolderUp, X, AlertTriangle, CheckCircle2, Maximize2, Minimize2, Settings, Loader2 } from "lucide-react";
+import { Upload, FileCode, Container, FileUp, FolderUp, X, AlertTriangle, CheckCircle2, Maximize2, Minimize2, Settings, Loader2, Clock, Zap } from "lucide-react";
+
 import { Editor } from "@monaco-editor/react";
 import { AppLayout } from "@/components/layout";
 import { PageHeader, FileExplorer } from "@/components/shared";
@@ -41,29 +42,25 @@ export default function CreateFunction() {
 
   const createFunction = useCreateFunction();
 
-  // Form state
-  // ... (previous state code)
   const [formData, setFormData] = useState({
     name: "",
     sourceType: "inline",
-    code: `#include <stdint.h>
-#include <string.h>
-#include <stdio.h>
+    code: `#include <milf.h>
 
-// Export the function - this is what the WASM runtime will call.
-// For complex data types (JSON/Strings), use this exact signature.
-__attribute__((visibility("default"))) __attribute__((used))
-int wasm_main(char* payload, int payload_len, char* out_buf, int out_max) {
+// MILF_EXPORT: marks function for platform access (Phase 3)
+// wasm_main: entrypoint for JSON-based invocations
+MILF_EXPORT int wasm_main(char* payload, int payload_len, char* out_buf, int out_max) {
   
   if (payload_len == 0) {
       const char* err = "{\\"error\\": \\"Empty payload\\"}";
-      strncpy(out_buf, err, out_max);
-      return strlen(err);
+      milf_memcpy(out_buf, err, milf_strlen(err));
+      return milf_strlen(err);
   }
 
-  // Example: Echo the input back inside a JSON envelope
-  int written = snprintf(out_buf, out_max, "{ \\"echo\\": %s, \\"status\\": \\"success\\" }", payload);
-  return (written >= out_max) ? out_max - 1 : written;
+  // Use milf.h utilities for small binaries
+  const char* msg = "{\\"status\\": \\"success\\", \\"message\\": \\"Hello from MILF Shared Headers!\\"}";
+  milf_memcpy(out_buf, msg, milf_strlen(msg));
+  return milf_strlen(msg);
 }
 `,
     runtime: "c",
@@ -74,6 +71,8 @@ int wasm_main(char* payload, int payload_len, char* out_buf, int out_max) {
     file: null as File | null,
     files: null as FileList | null,
     status: "active" as "active" | "inactive",
+    runType: "on_command" as "on_command" | "periodic",
+    cronExpression: "",
   });
 
   const [validationStatus, setValidationStatus] = useState<{ valid: boolean, message: string } | null>(null);
@@ -213,6 +212,8 @@ int wasm_main(char* payload, int payload_len, char* out_buf, int out_max) {
         tags: formData.tags.split(",").map(t => t.trim()).filter(Boolean),
         envVars: formData.envVars.filter(e => e.key),
         source: source,
+        runType: formData.runType,
+        cronExpression: formData.runType === "periodic" ? formData.cronExpression : "",
       });
 
       localStorage.removeItem(STORAGE_KEY);
@@ -311,6 +312,66 @@ int wasm_main(char* payload, int payload_len, char* out_buf, int out_max) {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          </div>
+
+          {/* Run Type & Schedule */}
+          <div className="bg-surface border border-border rounded-md p-6">
+            <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              Execution Mode
+            </h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => updateFormData("runType", "on_command")}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-md border text-left micro-transition",
+                    formData.runType === "on_command"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border hover:border-muted-foreground/50 hover:bg-muted/30"
+                  )}
+                >
+                  <Zap className={cn("h-4 w-4", formData.runType === "on_command" ? "text-primary" : "text-muted-foreground")} />
+                  <div>
+                    <span className="text-sm font-medium block">On Command</span>
+                    <span className="text-xs text-muted-foreground">Invoke manually or via API</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateFormData("runType", "periodic")}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-md border text-left micro-transition",
+                    formData.runType === "periodic"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border hover:border-muted-foreground/50 hover:bg-muted/30"
+                  )}
+                >
+                  <Clock className={cn("h-4 w-4", formData.runType === "periodic" ? "text-primary" : "text-muted-foreground")} />
+                  <div>
+                    <span className="text-sm font-medium block">Periodic (CRON)</span>
+                    <span className="text-xs text-muted-foreground">Run on a schedule</span>
+                  </div>
+                </button>
+              </div>
+
+              {formData.runType === "periodic" && (
+                <div className="space-y-2">
+                  <Label htmlFor="cron">Cron Expression</Label>
+                  <Input
+                    id="cron"
+                    placeholder="*/5 * * * *"
+                    value={formData.cronExpression}
+                    onChange={(e) => updateFormData("cronExpression", e.target.value)}
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Standard 5-field cron (minute hour day month weekday). Example: <code className="bg-muted px-1 rounded">*/5 * * * *</code> = every 5 minutes
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

@@ -44,7 +44,7 @@ export async function createFunction(data: any, token: string): Promise<any> {
     return runtime;
   };
 
-  const res = await fetch(`${API_BASE_URL}/functions/create`, {
+  const res = await fetch(`${API_BASE_URL}/api/v1/functions/create`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -55,6 +55,8 @@ export async function createFunction(data: any, token: string): Promise<any> {
       runtime: mapRuntime(data.runtime),
       memory: data.memory,
       sourceCode: data.source.type === "inline" ? data.source.code : "// uploaded",
+      run_type: data.runType || "on_command",
+      cron_expression: data.cronExpression || "",
       metadata: {},
     }),
   });
@@ -80,6 +82,8 @@ function transformLambda(fn: any) {
     avgDurationMs: undefined,
     invocations24h: 0,
     errors24h: 0,
+    runType: fn.run_type || "on_command",
+    cronExpression: fn.cron_expression || "",
     source: { type: "inline" as const, code: fn.source_code ? atob(fn.source_code) : "" },
   };
 }
@@ -129,7 +133,7 @@ export async function invokeFunction(id: string, input: any, token: string): Pro
     inputObj = input;
   }
 
-  const res = await fetch(`${API_BASE_URL}/functions/invoke`, {
+  const res = await fetch(`${API_BASE_URL}/api/v1/functions/invoke`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -143,7 +147,7 @@ export async function invokeFunction(id: string, input: any, token: string): Pro
 
 /* Executions/Invocations */
 export async function listInvocations(token: string, query?: { q?: string; status?: string }): Promise<any[]> {
-  const url = new URL(`${API_BASE_URL}/invocations`);
+  const url = new URL(`${API_BASE_URL}/api/v1/invocations`);
   if (query?.q) url.searchParams.set("q", query.q);
   if (query?.status) url.searchParams.set("status", query.status);
 
@@ -187,24 +191,63 @@ export async function getExecution(id: string, token: string): Promise<any> {
   };
 }
 
-/* Logs */
+/* Logs (Phase 4: Real Observability) */
 export async function listLogs(token: string, query?: { q?: string; level?: string }): Promise<any[]> {
-  // Use invocations as logs proxy until dedicated logs endpoint
-  const invocations = await listInvocations(token, { q: query?.q });
-  const logs = invocations.map((inv: any) => {
-    const isError = inv.status === "error";
-    return {
-      id: inv.id,
-      requestId: inv.requestId,
-      timestamp: inv.timestamp,
-      functionName: inv.functionName,
-      level: isError ? "error" : "info",
-      message: isError ? "Invocation failed" : "Invocation completed",
-      details: inv.error ? String(inv.error) : inv.output ? JSON.stringify(inv.output, null, 2) : undefined,
-    };
+  const url = new URL(`${API_BASE_URL}/api/v1/logs`);
+  if (query?.level && query.level !== "all") url.searchParams.set("level", query.level);
+
+  const res = await fetch(url, {
+    headers: { "Authorization": `Bearer ${token}` },
   });
-  if (query?.level && query.level !== "all") {
-    return logs.filter((log: any) => log.level === query.level);
-  }
-  return logs;
+  if (!res.ok) return [];
+  const body = await res.json();
+  const logs = Array.isArray(body) ? body : [];
+
+  // Transform to frontend LogEntity format & apply client-side search
+  return logs
+    .map((log: any) => ({
+      id: log.id,
+      requestId: log.request_id || log.id,
+      timestamp: log.timestamp,
+      functionName: log.function_name || "Unknown",
+      level: log.level || "info",
+      message: log.message || "",
+      details: log.details || undefined,
+    }))
+    .filter((log: any) => {
+      if (!query?.q) return true;
+      const q = query.q.toLowerCase();
+      return (
+        log.message.toLowerCase().includes(q) ||
+        log.functionName.toLowerCase().includes(q) ||
+        log.requestId.toLowerCase().includes(q)
+      );
+    });
+}
+
+/* Scheduler */
+export async function pauseSchedule(id: string, token: string): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/pause`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to pause schedule");
+  return res.json();
+}
+
+export async function resumeSchedule(id: string, token: string): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/resume`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to resume schedule");
+  return res.json();
+}
+
+export async function getScheduleStatus(id: string, token: string): Promise<{ id: string; paused: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/status`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to get schedule status");
+  return res.json();
 }

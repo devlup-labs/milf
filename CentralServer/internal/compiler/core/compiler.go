@@ -181,10 +181,17 @@ func (c *Compiler) compileC(req domain.CompilationRequest) ([]byte, error) {
 	// 7. Find sysroot from clang path. Usually it's in ../share/wasi-sysroot relative to bin/clang
 	sysroot := filepath.Join(filepath.Dir(filepath.Dir(c.clangPath)), "share", "wasi-sysroot")
 
+	// Resolve common_headers path (relative to CWD, which is CentralServer/)
+	commonHeadersDir := "common_headers"
+	if absPath, err := filepath.Abs(commonHeadersDir); err == nil {
+		commonHeadersDir = absPath
+	}
+
 	// Run clang to compile C → WASM (WASI)
 	args := []string{
 		"--target=wasm32-wasi",
 		fmt.Sprintf("--sysroot=%s", sysroot),
+		fmt.Sprintf("-I%s", commonHeadersDir), // Phase 3: inject shared headers
 		"-O1", // Lower optimization to avoid aggressive opcode usage
 		"-mno-bulk-memory",
 		"-mno-mutable-globals",

@@ -234,4 +234,25 @@ type LambdaService interface {
 	ActivateJob(ctx context.Context, funcID string, userID string) (bool, error)
 	ExecuteJob(ctx context.Context, funcID string, input string) (bool, error)
 	DeleteLambda(ctx context.Context, lambdaID string) error
+	PauseSchedule(ctx context.Context, lambdaID string) (bool, error)
+	ResumeSchedule(ctx context.Context, lambdaID string) (bool, error)
+	IsSchedulePaused(ctx context.Context, lambdaID string) bool
+	ListLogs(ctx context.Context, userID string, level string, limit int) ([]*LogEntry, error)
+}
+
+// --- Observability (Phase 4) ---
+
+type LogEntry struct {
+	ID           string    `json:"id"`
+	RequestID    string    `json:"request_id"`
+	FunctionName string    `json:"function_name"`
+	Level        string    `json:"level"`    // "info", "warn", "error"
+	Message      string    `json:"message"`
+	Details      string    `json:"details,omitempty"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+type LogRepository interface {
+	Insert(ctx context.Context, entry *LogEntry) error
+	List(ctx context.Context, userID string, level string, limit int) ([]*LogEntry, error)
 }

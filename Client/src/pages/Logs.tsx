@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, Copy, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, Copy, ChevronDown, ChevronRight, Activity, RotateCcw, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout";
 import { PageHeader } from "@/components/shared";
 import { Input } from "@/components/ui/input";
@@ -11,10 +11,14 @@ import { LogEntity } from "@/lib/mock/types";
 
 export default function Logs() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [levelFilter, setLevelFilter] = useState("all");
+  const [levelFilter, setLevelFilter] = useState<"all" | "info" | "warn" | "error">("all");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [liveMode, setLiveMode] = useState(false);
 
-  const { data: logs = [], isLoading } = useLogs({ q: searchQuery, level: levelFilter });
+  const { data: logs = [], isLoading, refetch, isFetching } = useLogs(
+    { q: searchQuery, level: levelFilter },
+    liveMode ? 2000 : false
+  );
 
   const toggleRow = (id: string) => {
     setExpandedRows((prev) => {
@@ -71,7 +75,7 @@ export default function Logs() {
             className="pl-8 h-8 bg-background"
           />
         </div>
-        <Select value={levelFilter} onValueChange={setLevelFilter}>
+        <Select value={levelFilter} onValueChange={(val) => setLevelFilter(val as any)}>
           <SelectTrigger className="w-32 h-8 bg-background">
             <SelectValue placeholder="Level" />
           </SelectTrigger>
@@ -82,6 +86,33 @@ export default function Logs() {
             <SelectItem value="error">Error</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-2">
+          {isFetching && !liveMode && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-8 gap-2 text-xs font-medium micro-transition",
+              liveMode ? "border-primary bg-primary/10 text-primary shadow-sm shadow-primary/20" : "text-muted-foreground"
+            )}
+            onClick={() => setLiveMode(!liveMode)}
+          >
+            <Activity className={cn("h-3.5 w-3.5", liveMode ? "animate-pulse" : "")} />
+            {liveMode ? "Live Monitoring..." : "Go Live"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RotateCcw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+          </Button>
+        </div>
       </div>
 
       {/* Log List */}

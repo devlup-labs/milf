@@ -21,6 +21,7 @@ type LambdaService struct {
 	compilerQueue *domain.CompilationQueue
 	executionRepo interfaces.ExecutionRepository
 	scheduler     *Scheduler // Added for Phase 2
+	logRepo       domain.LogRepository // Phase 4: Observability
 
 	// Registry for Synchronous Execution (RequestResponse mode)
 	resultWaiters sync.Map // map[executionID]chan *domain.Execution
@@ -28,6 +29,10 @@ type LambdaService struct {
 
 func (s *LambdaService) SetScheduler(sch *Scheduler) {
 	s.scheduler = sch
+}
+
+func (s *LambdaService) SetLogRepo(repo domain.LogRepository) {
+	s.logRepo = repo
 }
 
 func NewLambdaService(
@@ -138,6 +143,25 @@ func (s *LambdaService) NotifyResult(ctx context.Context, executionID string, ou
 		_ = s.executionRepo.UpdateStatus(ctx, executionID, status, output, errMsg)
 	}
 
+	// Phase 4: Log execution result
+	if s.logRepo != nil {
+		level := "info"
+		msg := "Execution completed"
+		details := fmt.Sprintf("output=%v", output)
+		if execErr != nil {
+			level = "error"
+			msg = "Execution failed"
+			details = errMsg
+		}
+		_ = s.logRepo.Insert(ctx, &domain.LogEntry{
+			RequestID:    executionID,
+			FunctionName: executionID, // best-effort; executionID often carries context
+			Level:        level,
+			Message:      msg,
+			Details:      details,
+		})
+	}
+
 	// Notify waiting HTTP goroutine if any
 	if waiter, ok := s.resultWaiters.Load(executionID); ok {
 		if ch, ok := waiter.(chan *domain.Execution); ok {
@@ -238,7 +262,18 @@ func (s *LambdaService) StoreandQueue(ctx context.Context, req *domain.LambdaSto
 		return false, domain.ErrInternalServer
 	}
 	utils.Info(fmt.Sprintf("[Gateway] Lambda %s saved to DB successfully", req.FuncID))
-	
+
+	// Phase 4: Log function creation
+	if s.logRepo != nil {
+		_ = s.logRepo.Insert(ctx, &domain.LogEntry{
+			RequestID:    req.FuncID,
+			FunctionName: req.FuncID,
+			Level:        "info",
+			Message:      "Function created and queued for compilation",
+			Details:      fmt.Sprintf("runtime=%s memory=%dMB run_type=%s", req.Runtime, req.MemoryMB, req.RunType),
+		})
+	}
+
 	// Phase 2: Notify scheduler if it's a periodic job
 	if s.scheduler != nil && req.RunType == domain.RunTypePeriodic {
 		go s.scheduler.SyncJobs(context.Background())
@@ -410,6 +445,38 @@ func (s *LambdaService) ListExecutions(ctx context.Context, userID string) ([]*d
 // DeleteLambda deletes a lambda function
 func (s *LambdaService) DeleteLambda(ctx context.Context, lambdaID string) error {
 	return s.gatewayDB.Delete(ctx, lambdaID)
+}
+
+// PauseSchedule pauses a periodic function's cron schedule
+func (s *LambdaService) PauseSchedule(ctx context.Context, lambdaID string) (bool, error) {
+	if s.scheduler == nil {
+		return false, errors.New("scheduler not initialized")
+	}
+	return s.scheduler.PauseJob(lambdaID), nil
+}
+
+// ResumeSchedule resumes a periodic function's cron schedule
+func (s *LambdaService) ResumeSchedule(ctx context.Context, lambdaID string) (bool, error) {
+	if s.scheduler == nil {
+		return false, errors.New("scheduler not initialized")
+	}
+	return s.scheduler.ResumeJob(ctx, lambdaID), nil
+}
+
+// IsSchedulePaused checks if a function's schedule is paused
+func (s *LambdaService) IsSchedulePaused(ctx context.Context, lambdaID string) bool {
+	if s.scheduler == nil {
+		return false
+	}
+	return s.scheduler.IsJobPaused(lambdaID)
+}
+
+// ListLogs returns log entries filtered by user, level, and limit
+func (s *LambdaService) ListLogs(ctx context.Context, userID string, level string, limit int) ([]*domain.LogEntry, error) {
+	if s.logRepo == nil {
+		return []*domain.LogEntry{}, nil
+	}
+	return s.logRepo.List(ctx, userID, level, limit)
 }
 
 func (s *LambdaService) SyncPendingTasks(ctx context.Context) error {

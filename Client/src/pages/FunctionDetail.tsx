@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Play, Settings2, Code, Activity, ScrollText, Copy, Download, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Settings2, Code, Activity, ScrollText, Copy, Download, Trash2, Loader2, Clock, Pause, RotateCcw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { AppLayout } from "@/components/layout";
 import { StatusBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { useFunction, useInvokeFunction, useLogs, useDeleteFunction, useExecution } from "@/hooks/useQueries";
+import { useFunction, useInvokeFunction, useLogs, useDeleteFunction, useExecution, usePauseSchedule, useResumeSchedule, useScheduleStatus } from "@/hooks/useQueries";
 import { useToast } from "@/hooks/use-toast";
 import { InvokeModal } from "@/components/InvokeModal";
 
@@ -41,6 +41,12 @@ export default function FunctionDetail() {
   
   // Poll execution if we have an ID
   const { data: executionResult } = useExecution(currentExecutionId);
+
+  // Scheduler hooks
+  const pauseSchedule = usePauseSchedule();
+  const resumeSchedule = useResumeSchedule();
+  const isPeriodic = functionData?.runType === "periodic";
+  const { data: scheduleStatus, refetch: refetchScheduleStatus } = useScheduleStatus(isPeriodic ? id : undefined);
 
   // Sync execution status to output UI
   useEffect(() => {
@@ -238,6 +244,77 @@ export default function FunctionDetail() {
               </div>
             </dl>
           </div>
+
+          {/* Scheduler Info for Periodic Functions */}
+          {isPeriodic && (
+            <div className="bg-surface border border-border rounded-md p-4 mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  Schedule
+                </h3>
+                <div className="flex items-center gap-2">
+                  {scheduleStatus?.paused ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="gap-1.5"
+                      onClick={async () => {
+                        if (!id) return;
+                        await resumeSchedule.mutateAsync(id);
+                        refetchScheduleStatus();
+                        toast({ title: "Schedule resumed" });
+                      }}
+                      disabled={resumeSchedule.isPending}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Resume
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="gap-1.5"
+                      onClick={async () => {
+                        if (!id) return;
+                        await pauseSchedule.mutateAsync(id);
+                        refetchScheduleStatus();
+                        toast({ title: "Schedule paused" });
+                      }}
+                      disabled={pauseSchedule.isPending}
+                    >
+                      <Pause className="h-3.5 w-3.5" />
+                      Pause
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-muted-foreground">Run Type</dt>
+                  <dd className="font-mono mt-1 capitalize">{functionData?.runType}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Cron Expression</dt>
+                  <dd className="font-mono mt-1">{functionData?.cronExpression || "-"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd className="mt-1">
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium",
+                      scheduleStatus?.paused
+                        ? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"
+                        : "bg-green-500/10 text-green-500 border border-green-500/20"
+                    )}>
+                      <span className={cn("w-1.5 h-1.5 rounded-full", scheduleStatus?.paused ? "bg-yellow-500" : "bg-green-500")} />
+                      {scheduleStatus?.paused ? "Paused" : "Active"}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
         </TabsContent>
 
         {/* Code Tab */}

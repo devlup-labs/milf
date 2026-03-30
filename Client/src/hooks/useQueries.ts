@@ -122,15 +122,16 @@ export function useInvocations(query?: { q?: string; status?: "success" | "error
 }
 
 // --- Logs ---
-export function useLogs(query?: { q?: string; level?: "info" | "warn" | "error" | "all" }) {
+export function useLogs(query?: { q?: string; level?: "info" | "warn" | "error" | "all" }, refetchInterval: number | false = false) {
     const { session } = useAuth();
     return useQuery({
         queryKey: keys.logs.list(query),
         queryFn: () => {
             if (!session?.token) throw new Error("Not authenticated");
-            return api.listLogs(session.token, { q: query?.q });
+            return api.listLogs(session.token, { q: query?.q, level: query?.level });
         },
         enabled: !!session?.token,
+        refetchInterval: refetchInterval,
     });
 }
 
@@ -153,6 +154,49 @@ export function useExecution(id: string | null) {
             }
             return false; // Stop polling
         },
+    });
+}
+
+// --- Scheduler ---
+export function usePauseSchedule() {
+    const queryClient = useQueryClient();
+    const { session } = useAuth();
+    return useMutation({
+        mutationFn: (id: string) => {
+            if (!session?.token) throw new Error("Not authenticated");
+            return api.pauseSchedule(id, session.token);
+        },
+        onSuccess: (_, id) => {
+            queryClient.invalidateQueries({ queryKey: ["schedule", id] });
+            queryClient.invalidateQueries({ queryKey: keys.functions.detail(id) });
+        },
+    });
+}
+
+export function useResumeSchedule() {
+    const queryClient = useQueryClient();
+    const { session } = useAuth();
+    return useMutation({
+        mutationFn: (id: string) => {
+            if (!session?.token) throw new Error("Not authenticated");
+            return api.resumeSchedule(id, session.token);
+        },
+        onSuccess: (_, id) => {
+            queryClient.invalidateQueries({ queryKey: ["schedule", id] });
+            queryClient.invalidateQueries({ queryKey: keys.functions.detail(id) });
+        },
+    });
+}
+
+export function useScheduleStatus(id: string | undefined) {
+    const { session } = useAuth();
+    return useQuery({
+        queryKey: ["schedule", id],
+        queryFn: () => {
+            if (!session?.token) throw new Error("Not authenticated");
+            return api.getScheduleStatus(id!, session.token);
+        },
+        enabled: !!id && !!session?.token,
     });
 }
 

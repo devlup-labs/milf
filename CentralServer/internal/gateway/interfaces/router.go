@@ -45,21 +45,29 @@ func (r *Router) Setup() http.Handler {
 	})
 	r.mux.HandleFunc("GET /api/v1/executions/{id}", wrap(r.handler.GetExecution))
 
+	// Scheduler control routes
+	r.mux.HandleFunc("POST /api/v1/lambdas/{id}/schedule/pause", wrap(r.handler.PauseSchedule))
+	r.mux.HandleFunc("POST /api/v1/lambdas/{id}/schedule/resume", wrap(r.handler.ResumeSchedule))
+	r.mux.HandleFunc("GET /api/v1/lambdas/{id}/schedule/status", wrap(r.handler.GetScheduleStatus))
+
+	// Observability (Phase 4)
+	r.mux.HandleFunc("GET /api/v1/logs", wrap(r.handler.ListLogs))
+
 	// Compat (legacy client) APIs
 	r.mux.HandleFunc(
-		"POST /functions/invoke",
+		"POST /api/v1/functions/invoke",
 		wrap(r.compatHandler.Invoke),
 	)
 	r.mux.HandleFunc(
-		"POST /functions/create",
+		"POST /api/v1/functions/create",
 		wrap(r.compatHandler.Create),
 	)
 	r.mux.HandleFunc(
-		"GET /functions/{id}",
+		"GET /api/v1/functions/{id}",
 		wrap(r.compatHandler.Get),
 	)
 	r.mux.HandleFunc(
-		"GET /invocations",
+		"GET /api/v1/invocations",
 		wrap(r.compatHandler.ListInvocations),
 	)
 

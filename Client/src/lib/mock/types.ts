@@ -18,6 +18,8 @@ export interface FunctionEntity {
   avgDurationMs?: number;
   invocations24h: number;
   errors24h: number;
+  runType?: "on_command" | "periodic";
+  cronExpression?: string;
   source:
   | { type: "inline"; code: string }
   | { type: "zip"; fileName: string; files: SourceFile[]; entryPath?: string }
