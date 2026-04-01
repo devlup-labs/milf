@@ -1,6 +1,6 @@
-project(consumeronlywamr)
-
 cmake_minimum_required(VERSION 3.10.2)
+project(consumeronlywamr)
+enable_language(ASM)
 
 set(WAMR_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wamr)
 
@@ -29,9 +29,24 @@ include_directories(${WAMR_ROOT_DIR}/core/shared/platform/common/libc-util)
 # Helper function to add source files
 file(GLOB COMMON_SRC
     "${WAMR_ROOT_DIR}/core/iwasm/common/*.c"
-    "${WAMR_ROOT_DIR}/core/iwasm/common/arch/*.c"
     "${WAMR_ROOT_DIR}/core/shared/platform/common/libc-util/libc_errno.c"
 )
+
+if(${CMAKE_ANDROID_ARCH_ABI} MATCHES "arm64-v8a" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)")
+    list(APPEND COMMON_SRC "${WAMR_ROOT_DIR}/core/iwasm/common/arch/invokeNative_aarch64.s")
+    add_compile_definitions(BUILD_TARGET_AARCH64=1)
+elseif(${CMAKE_ANDROID_ARCH_ABI} MATCHES "armeabi-v7a" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm)")
+    list(APPEND COMMON_SRC "${WAMR_ROOT_DIR}/core/iwasm/common/arch/invokeNative_arm.s")
+    add_compile_definitions(BUILD_TARGET_ARM=1)
+elseif(${CMAKE_ANDROID_ARCH_ABI} MATCHES "x86_64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)")
+    list(APPEND COMMON_SRC "${WAMR_ROOT_DIR}/core/iwasm/common/arch/invokeNative_em64.s")
+    add_compile_definitions(BUILD_TARGET_X86_64=1)
+elseif(${CMAKE_ANDROID_ARCH_ABI} MATCHES "x86" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(i686|x86)")
+    list(APPEND COMMON_SRC "${WAMR_ROOT_DIR}/core/iwasm/common/arch/invokeNative_ia32.s")
+    add_compile_definitions(BUILD_TARGET_X86_32=1)
+else()
+    list(APPEND COMMON_SRC "${WAMR_ROOT_DIR}/core/iwasm/common/arch/invokeNative_general.c")
+endif()
 file(GLOB INTERP_SRC
     "${WAMR_ROOT_DIR}/core/iwasm/interpreter/*.c"
 )
@@ -77,6 +92,8 @@ add_definitions(
     -DBH_FREE=wasm_runtime_free
     -DWASM_HAVE_MREMAP=1
     -DWASM_ENABLE_BULK_MEMORY=1
+    -DWASM_ENABLE_BULK_MEMORY_OPT=1
+    -DWASM_DISABLE_HW_BOUND_CHECK=1
 )
 
 add_library(

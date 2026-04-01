@@ -86,4 +86,40 @@ static inline int32_t milf_max(int32_t a, int32_t b) {
     return a > b ? a : b;
 }
 
+/* ── Networking (Host Functions) ────────────────────────────────────────── */
+
+/**
+ * Open a network stream from a pre-signed URL.
+ * RETURNS: Stream handle ID (> 0) or error code (< 0)
+ */
+__attribute__((import_module("env"), import_name("milf_stream_open")))
+extern int milf_stream_open(const char* url);
+
+/**
+ * Read bytes from an open stream into the WASM target buffer.
+ * RETURNS: Bytes read, or 0 on EOF, or error code (< 0)
+ */
+__attribute__((import_module("env"), import_name("milf_stream_read")))
+extern int milf_stream_read(int handle, char* target_buf, int chunk_size);
+
+/**
+ * Close an open network stream.
+ */
+__attribute__((import_module("env"), import_name("milf_stream_close")))
+extern void milf_stream_close(int handle);
+
+/**
+ * Generate a PDF from text input.
+ * RETURNS: Size of the generated PDF in bytes, or error code (< 0)
+ */
+__attribute__((import_module("env"), import_name("milf_pdf_generate")))
+extern int milf_pdf_generate(const char* text, char* target_buf, int max_len);
+
+/**
+ * Save a byte buffer as a permanent file in local storage.
+ * RETURNS: 0 if success, or error code (< 0)
+ */
+__attribute__((import_module("env"), import_name("milf_storage_save")))
+extern int milf_storage_save(const char* name, const char* data, int len);
+
 #endif /* MILF_H */

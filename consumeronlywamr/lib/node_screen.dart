@@ -23,6 +23,11 @@ class NodeScreen extends StatelessWidget {
             ),
             actions: [
               IconButton(
+                icon: const Icon(Icons.picture_as_pdf, color: Colors.blueAccent),
+                tooltip: 'Test Fetch & PDF',
+                onPressed: () => ctrl.testFetchAndPdf(),
+              ),
+              IconButton(
                 icon: const Icon(Icons.settings, color: Colors.white70),
                 onPressed: () => Navigator.pushNamed(context, '/settings'),
               ),

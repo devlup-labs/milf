@@ -38,7 +38,7 @@ export default function FunctionDetail() {
   const { data: functionData, isLoading, error } = useFunction(id!);
   const invokeFunction = useInvokeFunction();
   const deleteFunction = useDeleteFunction();
-  
+
   // Poll execution if we have an ID
   const { data: executionResult } = useExecution(currentExecutionId);
 
@@ -51,17 +51,23 @@ export default function FunctionDetail() {
   // Sync execution status to output UI
   useEffect(() => {
     if (executionResult) {
-       if (executionResult.status === "pending" || executionResult.status === "running") {
-           setTestOutput("Waiting for mobile node execution... (Polling)");
-       } else if (executionResult.status === "completed") {
-           setTestOutput(JSON.stringify(executionResult.output, null, 2));
-           toast({title: "Execution Completed!"});
-           setCurrentExecutionId(null);
-       } else if (executionResult.status === "failed") {
-           setTestOutput("Error: " + executionResult.error);
-           toast({title: "Execution Failed", variant: "destructive"});
-           setCurrentExecutionId(null);
-       }
+      if (executionResult.status === "pending" || executionResult.status === "running") {
+        setTestOutput("Waiting for mobile node execution... (Polling)");
+      } else if (executionResult.status === "completed") {
+        let output = executionResult.output;
+        if (typeof output === 'string') {
+          try { output = JSON.parse(output); } catch(e) {}
+        }
+        if (output && typeof output === 'object' && 'download_url' in output) {
+          setTestOutput(`File ready: ${output.filename || 'output'} (${output.size ? Math.round(output.size / 1024) + ' KB' : 'unknown size'})`);
+        } else {
+          setTestOutput(JSON.stringify(output, null, 2));
+        }
+        toast({ title: "Execution Completed!" });
+      } else if (executionResult.status === "failed") {
+        setTestOutput("Error: " + executionResult.error);
+        toast({ title: "Execution Failed", variant: "destructive" });
+      }
     }
   }, [executionResult, toast]);
 
@@ -75,12 +81,12 @@ export default function FunctionDetail() {
     try {
       const result = await invokeFunction.mutateAsync({ id, input: inputPayload });
       if (result.acknowledged && result.execution_id) {
-         setCurrentExecutionId(result.execution_id);
-         setTestOutput("Task dispatched to mobile node. Waiting for result...");
+        setCurrentExecutionId(result.execution_id);
+        setTestOutput("Task dispatched to mobile node. Waiting for result...");
       } else if (result.execution_id) {
-         setCurrentExecutionId(result.execution_id);
+        setCurrentExecutionId(result.execution_id);
       } else {
-         setTestOutput(JSON.stringify(result, null, 2));
+        setTestOutput(JSON.stringify(result, null, 2));
       }
     } catch (e) {
       toast({
@@ -378,28 +384,62 @@ export default function FunctionDetail() {
             </Button>
             {/* Output area */}
             {testOutput && (
-              <div className="w-full max-w-2xl">
-                <div className="bg-terminal border border-border rounded-md">
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+              <div className="w-full max-w-2xl px-4">
+                <div className="bg-terminal border border-border rounded-md overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/50">
                     <span className="text-xs text-muted-foreground">Execution Output</span>
-                    {executionResult?.output?.data && (
-                      <Button size="sm" variant="secondary" className="h-6 text-xs" onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = `data:application/octet-stream;base64,${executionResult.output.data}`;
-                        link.download = "result.bin";
-                        link.click();
-                      }}>
-                        <Download className="h-3 w-3 mr-1" /> Download
-                      </Button>
-                    )}
                   </div>
                   <pre className="p-4 text-sm font-mono text-foreground whitespace-pre-wrap overflow-auto max-h-64">
                     {testOutput}
                   </pre>
+                  
+                  {(() => {
+                    let output = executionResult?.output;
+                    if (typeof output === 'string') {
+                      try { output = JSON.parse(output); } catch(e) {}
+                    }
+                    if (executionResult?.status === "completed" && output?.download_url) {
+                      const downloadHref = `http://localhost:8080${output.download_url}`;
+                      return (
+                       <div className="p-6 flex flex-col items-center border-t border-border bg-emerald-500/5">
+                          <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
+                             <Download className="h-6 w-6 text-emerald-600" />
+                          </div>
+                          <p className="text-sm font-medium mb-3">
+                            {output.filename || 'File'} ready for download
+                          </p>
+                          <p className="text-xs text-muted-foreground mb-4">
+                            {output.content_type} · {output.size ? `${Math.round(output.size / 1024)} KB` : ''}
+                          </p>
+                          <a
+                            href={downloadHref}
+                            download={output.filename || 'result'}
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors shadow-lg shadow-emerald-600/25"
+                          >
+                            <Download className="h-5 w-5" />
+                            Download {output.filename || 'File'}
+                          </a>
+                          
+                          {output.content_type === 'application/pdf' && (
+                            <div className="w-full mt-6 bg-white rounded-lg shadow-sm border border-border overflow-hidden" style={{height: '500px'}}>
+                              <embed 
+                                src={downloadHref} 
+                                type="application/pdf" 
+                                width="100%" 
+                                height="100%" 
+                                className="border-0"
+                              />
+                            </div>
+                          )}
+                       </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
             )}
-            {(invokeFunction.isPending || currentExecutionId) && !testOutput && (
+            {(invokeFunction.isPending || (currentExecutionId && !testOutput)) && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Waiting for mobile node...
               </div>

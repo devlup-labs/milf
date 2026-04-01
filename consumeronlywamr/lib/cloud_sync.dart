@@ -6,12 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-typedef TaskCallback = Future<void> Function({
-  required String executionId,
-  required String lambdaId,
-  required Uint8List wasmBytes,
-  required Uint8List payload,
-});
+typedef TaskCallback =
+    Future<void> Function({
+      required String executionId,
+      required String lambdaId,
+      required Uint8List wasmBytes,
+      required Uint8List payload,
+    });
 
 /// Decodes the typed input envelope sent by the server.
 /// The server MUST tag the input type to disambiguate:
@@ -154,19 +155,24 @@ class CloudSync {
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     _sendHeartbeat(); // immediate on connect
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) => _sendHeartbeat());
+    _heartbeatTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _sendHeartbeat(),
+    );
   }
 
   void _sendHeartbeat() {
     if (!isConnected) return;
-    _channel!.sink.add(jsonEncode({
-      'type': 'heartbeat',
-      'payload': {
-        'sink_id': _sinkId,
-        'ram_available_mb': 2048,
-        'storage_available_mb': 10240,
-      },
-    }));
+    _channel!.sink.add(
+      jsonEncode({
+        'type': 'heartbeat',
+        'payload': {
+          'sink_id': _sinkId,
+          'ram_available_mb': 2048,
+          'storage_available_mb': 10240,
+        },
+      }),
+    );
   }
 
   // ── Message Handling ──────────────────────────────────────────────────────
@@ -202,7 +208,11 @@ class CloudSync {
       }
 
       if (wasmBytes == null) {
-        sendResult(executionId, success: false, error: 'Failed to acquire WASM binary');
+        sendResult(
+          executionId,
+          success: false,
+          error: 'Failed to acquire WASM binary',
+        );
         return;
       }
 
@@ -229,7 +239,9 @@ class CloudSync {
       }
       final res = await http.get(
         Uri.parse(url),
-        headers: {if (authToken.isNotEmpty) 'Authorization': 'Bearer $authToken'},
+        headers: {
+          if (authToken.isNotEmpty) 'Authorization': 'Bearer $authToken',
+        },
       );
       if (res.statusCode == 200) return res.bodyBytes;
       onLog('WASM download failed (${res.statusCode})');
@@ -241,7 +253,12 @@ class CloudSync {
 
   // ── Result Reporting ──────────────────────────────────────────────────────
 
-  void sendResult(String executionId, {required bool success, dynamic output, String? error}) {
+  void sendResult(
+    String executionId, {
+    required bool success,
+    dynamic output,
+    String? error,
+  }) {
     if (!isConnected) {
       onLog('Cannot send result: not connected');
       return;
@@ -250,19 +267,23 @@ class CloudSync {
     dynamic serializedOutput;
     if (output is Uint8List) {
       serializedOutput = {'data': base64Encode(output)};
+    } else if (output is Map) {
+      serializedOutput = output;
     } else if (output != null) {
       serializedOutput = {'result': output.toString()};
     }
 
-    _channel!.sink.add(jsonEncode({
-      'type': 'task_result',
-      'payload': {
-        'execution_id': executionId,
-        'success': success,
-        if (serializedOutput != null) 'output': serializedOutput,
-        if (error != null) 'error': error,
-      },
-    }));
+    _channel!.sink.add(
+      jsonEncode({
+        'type': 'task_result',
+        'payload': {
+          'execution_id': executionId,
+          'success': success,
+          if (serializedOutput != null) 'output': serializedOutput,
+          if (error != null) 'error': error,
+        },
+      }),
+    );
 
     _sendHeartbeat(); // signal ready for next task
   }

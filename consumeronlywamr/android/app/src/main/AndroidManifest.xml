@@ -9,7 +9,7 @@
         android:icon="@mipmap/ic_launcher">
         <service
             android:name=".WasmService"
-            android:isolatedProcess="true"
+            android:process=":wasm_engine"
             android:exported="false" />
             
         <activity

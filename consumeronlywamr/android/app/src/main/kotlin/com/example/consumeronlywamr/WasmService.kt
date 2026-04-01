@@ -3,6 +3,7 @@ package com.example.consumeronlywamr
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 
 // Controller
 
@@ -12,6 +13,12 @@ class WasmService : Service() {
         super.onCreate()
         // Initialize WASM runtime when service starts
         initWasm()
+        
+        // Setup JNI bridge for HTTP Streaming
+        val streamer = HttpStreamer()
+        streamer.setStorageDir(filesDir)
+        streamer.bindNative()
+        Log.i("WasmService", "HttpStreamer Native bindings initialized with storage at ${filesDir.absolutePath}")
     }
 
     private val binder =

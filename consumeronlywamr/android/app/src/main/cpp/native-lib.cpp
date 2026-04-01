@@ -11,7 +11,10 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
+static JavaVM *g_jvm = NULL;
+
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+  g_jvm = vm;
   LOGI("JNI_OnLoad called");
   LOGI("sizeof(WASMModuleInstance) = %zu", sizeof(WASMModuleInstance));
   LOGI("sizeof(WASMModuleInstanceExtra) = %zu",
@@ -21,7 +24,121 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
   return JNI_VERSION_1_6;
 }
 
-// REMOVED: static char global_heap_buf[512 * 1024];
+// --- Host Functions for Networking ---
+static jobject g_http_streamer = NULL;
+static jclass g_http_streamer_class = NULL;
+
+JNIEnv* getEnv() {
+    JNIEnv *env;
+    if (!g_jvm) return NULL;
+    int status = g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+    if(status < 0) {
+        status = g_jvm->AttachCurrentThread(&env, NULL);
+        if(status < 0) return NULL;
+    }
+    return env;
+}
+
+extern "C" int native_milf_stream_open(wasm_exec_env_t exec_env, const char* url) {
+    LOGI("native_milf_stream_open called with mapped URL: %p", url);
+
+    if (!exec_env) {
+        LOGE("exec_env is NULL!");
+        return -1;
+    }
+
+    if (!url) {
+        LOGE("Mapped URL pointer is NULL!");
+        return -1;
+    }
+
+    LOGI("Opening stream for URL: %s", url);
+
+    JNIEnv* env = getEnv();
+    if (!env || !g_http_streamer || !g_http_streamer_class) {
+        LOGE("JNI setup failed in stream_open");
+        return -1;
+    }
+
+    jstring jurl = env->NewStringUTF(url);
+    jmethodID mid = env->GetMethodID(g_http_streamer_class, "openStream", "(Ljava/lang/String;)I");
+    int handle = env->CallIntMethod(g_http_streamer, mid, jurl);
+    env->DeleteLocalRef(jurl);
+    return handle;
+}
+
+extern "C" int native_milf_stream_read(wasm_exec_env_t exec_env, int handle, uint32_t buf_offset, uint32_t chunk_size) {
+    wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
+    if (!wasm_runtime_validate_app_addr(module_inst, buf_offset, chunk_size)) {
+        return -2; // Out of bounds
+    }
+    void *native_buf = wasm_runtime_addr_app_to_native(module_inst, buf_offset);
+    
+    JNIEnv* env = getEnv();
+    if (!env || !g_http_streamer || !g_http_streamer_class) return -1;
+    jobject directBuffer = env->NewDirectByteBuffer(native_buf, chunk_size);
+    jmethodID mid = env->GetMethodID(g_http_streamer_class, "readChunk", "(IILjava/nio/ByteBuffer;)I");
+    int bytes_read = env->CallIntMethod(g_http_streamer, mid, handle, chunk_size, directBuffer);
+    env->DeleteLocalRef(directBuffer);
+    return bytes_read;
+}
+
+extern "C" void native_milf_stream_close(wasm_exec_env_t exec_env, int handle) {
+    JNIEnv* env = getEnv();
+    if (!env || !g_http_streamer || !g_http_streamer_class) return;
+    jmethodID mid = env->GetMethodID(g_http_streamer_class, "closeStream", "(I)V");
+    env->CallVoidMethod(g_http_streamer, mid, handle);
+}
+
+extern "C" int native_milf_pdf_generate(wasm_exec_env_t exec_env, const char* text, void* target_buf, uint32_t max_len) {
+    JNIEnv* env = getEnv();
+    if (!env || !g_http_streamer || !g_http_streamer_class) return -1;
+    
+    jstring jtext = env->NewStringUTF(text);
+    jmethodID mid = env->GetMethodID(g_http_streamer_class, "generatePdf", "(Ljava/lang/String;)[B");
+    jbyteArray jpdf = (jbyteArray)env->CallObjectMethod(g_http_streamer, mid, jtext);
+    
+    if (!jpdf) {
+        env->DeleteLocalRef(jtext);
+        return -1;
+    }
+    
+    jsize pdf_len = env->GetArrayLength(jpdf);
+    if (pdf_len > (jsize)max_len) {
+        pdf_len = (jsize)max_len;
+    }
+    
+    env->GetByteArrayRegion(jpdf, 0, pdf_len, (jbyte*)target_buf);
+    
+    env->DeleteLocalRef(jtext);
+    env->DeleteLocalRef(jpdf);
+    return (int)pdf_len;
+}
+
+extern "C" int native_milf_storage_save(wasm_exec_env_t exec_env, const char* name, void* data, uint32_t len) {
+    JNIEnv* env = getEnv();
+    if (!env || !g_http_streamer || !g_http_streamer_class) return -1;
+    
+    jstring jname = env->NewStringUTF(name);
+    jbyteArray jdata = env->NewByteArray(len);
+    env->SetByteArrayRegion(jdata, 0, len, (jbyte*)data);
+    
+    jmethodID mid = env->GetMethodID(g_http_streamer_class, "saveToStorage", "(Ljava/lang/String;[B)I");
+    int result = env->CallIntMethod(g_http_streamer, mid, jname, jdata);
+    
+    env->DeleteLocalRef(jname);
+    env->DeleteLocalRef(jdata);
+    return result;
+}
+
+static NativeSymbol native_symbols[] = {
+    {"milf_stream_open", (void *)native_milf_stream_open, "($)i", NULL},
+    {"milf_stream_read", (void *)native_milf_stream_read, "(iii)i", NULL},
+    {"milf_stream_close", (void *)native_milf_stream_close, "(i)", NULL},
+    {"milf_pdf_generate", (void *)native_milf_pdf_generate, "($*~)i", NULL},
+    {"milf_storage_save", (void *)native_milf_storage_save, "($*~)i", NULL}
+};
+
 // Now using system allocator for dynamic memory!
 
 extern "C" JNIEXPORT jint JNICALL
@@ -45,10 +162,25 @@ Java_com_example_consumeronlywamr_WasmService_initWasm(JNIEnv *env,
     return -1;
   }
 
+  // Register Native Host functions
+  if (!wasm_runtime_register_natives("env", native_symbols, sizeof(native_symbols) / sizeof(NativeSymbol))) {
+    LOGE("Failed to register native symbols");
+    return -1;
+  }
+
   LOGI("Init runtime environment success.");
   LOGI("  Max heap: %zu MB", MemoryTracker::GetMaxHeap() / (1024 * 1024));
   LOGI("  Max stack: %zu MB", MemoryTracker::GetMaxStack() / (1024 * 1024));
   return 0;
+}
+
+// Give Kotlin a way to pass the HttpStreamer instance down to C++
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_consumeronlywamr_HttpStreamer_bindNative(JNIEnv *env, jobject streamerObj) {
+    g_http_streamer = env->NewGlobalRef(streamerObj);
+    jclass cls = env->GetObjectClass(streamerObj);
+    g_http_streamer_class = (jclass)env->NewGlobalRef(cls);
+    env->DeleteLocalRef(cls);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -487,7 +619,7 @@ Java_com_example_consumeronlywamr_WasmService_invokeDataWasmNative(
   }
 
   // 4. Create Exec Env
-  exec_env = wasm_runtime_create_exec_env(module_inst, 8192);
+  exec_env = wasm_runtime_create_exec_env(module_inst, 32768);
   if (!exec_env) {
     LOGE("Exec env creation failed");
     goto cleanup;

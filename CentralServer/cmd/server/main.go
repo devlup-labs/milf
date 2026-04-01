@@ -27,6 +27,7 @@ import (
 	sinkhandler "central_server/internal/sinkManager/handler"
 	sinkinterfaces "central_server/internal/sinkManager/interfaces"
 	"central_server/internal/storage"
+	"central_server/internal/filestore"
 	"central_server/utils"
 )
 
@@ -208,7 +209,7 @@ func main() {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Filename")
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return
@@ -245,6 +246,14 @@ func main() {
 	mux.Handle("/api/v1/sinks/", sinkMux)
 	mux.Handle("/api/v1/sinks", sinkMux)
 	mux.Handle("/api/v1/tasks/", sinkMux)
+
+	// Mount file store routes (for binary file upload/download)
+	fileStore, err := filestore.NewFileStore("./uploads")
+	if err != nil {
+		log.Fatalf("failed to create file store: %v", err)
+	}
+	mux.HandleFunc("POST /api/v1/files", fileStore.HandleUpload)
+	mux.HandleFunc("GET /api/v1/files/{id}", fileStore.HandleDownload)
 
 	addr := ":8080"
 	log.Printf("server listening on %s", addr)

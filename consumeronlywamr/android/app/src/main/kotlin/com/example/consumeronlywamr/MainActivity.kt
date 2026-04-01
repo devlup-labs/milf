@@ -102,6 +102,23 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGS", "Missing arguments for invokeWasmString", null)
                     }
                 }
+                "readLocalFile" -> {
+                    val name = call.argument<String>("name")
+                    if (name != null) {
+                        try {
+                            val file = java.io.File(filesDir, name)
+                            if (file.exists()) {
+                                result.success(file.readBytes())
+                            } else {
+                                result.error("FILE_NOT_FOUND", "File $name not found in $filesDir", null)
+                            }
+                        } catch (e: Exception) {
+                            result.error("READ_ERROR", e.toString(), null)
+                        }
+                    } else {
+                        result.error("INVALID_ARGS", "Missing file name", null)
+                    }
+                }
                 "invokeDataWasm" -> {
                     val bytes = call.argument<ByteArray>("bytes")
                     val func = call.argument<String>("funcName") // TODO: think about the convinient way for this or can be use something as lambda_handler

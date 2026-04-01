@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'cloud_sync.dart';
 
 /// Tracks a single WASM execution for the history log.
@@ -64,7 +66,8 @@ class NodeController extends ChangeNotifier {
   // ── Internal ──────────────────────────────────────────────────────────────
   CloudSync? _sync;
 
-  bool get isConnected => status == NodeStatus.online || status == NodeStatus.executing;
+  bool get isConnected =>
+      status == NodeStatus.online || status == NodeStatus.executing;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -116,7 +119,8 @@ class NodeController extends ChangeNotifier {
 
   void _log(String msg) {
     final timestamp = DateTime.now();
-    final hms = '${timestamp.hour.toString().padLeft(2, '0')}:'
+    final hms =
+        '${timestamp.hour.toString().padLeft(2, '0')}:'
         '${timestamp.minute.toString().padLeft(2, '0')}:'
         '${timestamp.second.toString().padLeft(2, '0')}';
     logBuffer += '[$hms] $msg\n';
@@ -158,21 +162,23 @@ class NodeController extends ChangeNotifier {
 
       Future<dynamic> methodCall;
       // Extract optional function name hint (reserved key '_func')
-      final String funcName = (jsonPayload != null && jsonPayload.containsKey('_func'))
+      final String funcName =
+          (jsonPayload != null && jsonPayload.containsKey('_func'))
           ? jsonPayload['_func'].toString()
           : 'wasm_main';
 
       // Filter out reserved keys to get user-supplied parameters
       final paramPayload = jsonPayload != null
           ? Map<String, dynamic>.fromEntries(
-              jsonPayload.entries.where((e) => !e.key.startsWith('_')))
+              jsonPayload.entries.where((e) => !e.key.startsWith('_')),
+            )
           : <String, dynamic>{};
 
       if (paramPayload.isNotEmpty) {
         // Check if ANY parameter requires string/complex data type handling
         bool hasComplexTypes = false;
         final List<int> intArgs = [];
-        
+
         for (final value in paramPayload.values) {
           if (value is int) {
             intArgs.add(value);
@@ -196,7 +202,9 @@ class NodeController extends ChangeNotifier {
           });
         } else {
           // Pure integer function (original fast path)
-          _log('Int-args task (${intArgs.length} params): $intArgs → $funcName');
+          _log(
+            'Int-args task (${intArgs.length} params): $intArgs → $funcName',
+          );
           methodCall = _platform.invokeMethod('invokeWasm', {
             'bytes': wasmBytes,
             'funcName': funcName,
@@ -214,20 +222,62 @@ class NodeController extends ChangeNotifier {
       }
 
       final dynamic result = await methodCall.timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => throw Exception('Execution timed out after 30s'),
-          );
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Execution timed out after 30s'),
+      );
 
-      _sync?.sendResult(executionId, success: true, output: result);
+      dynamic finalOutput = result;
+      if (result is String && result.startsWith('FILE:')) {
+        final fileName = result.substring(5);
+        _log('Result is a file reference: $fileName. Uploading to server...');
+        try {
+          final fileBytes = await _platform.invokeMethod<Uint8List>('readLocalFile', {'name': fileName});
+          if (fileBytes != null && fileBytes.isNotEmpty) {
+            // Upload file to server via HTTP POST
+            var uploadUrl = '$serverUrl/api/v1/files';
+            if (Platform.isAndroid) {
+              uploadUrl = uploadUrl.replaceAll('localhost', '10.0.2.2');
+            }
+            final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
+            request.files.add(http.MultipartFile.fromBytes(
+              'file',
+              fileBytes,
+              filename: fileName,
+            ));
+            final response = await request.send();
+            final respBody = await response.stream.bytesToString();
+            if (response.statusCode == 201) {
+              final respJson = jsonDecode(respBody);
+              finalOutput = {
+                'file_id': respJson['file_id'],
+                'filename': respJson['filename'],
+                'download_url': respJson['download_url'],
+                'size': respJson['size'],
+                'content_type': respJson['content_type'],
+              };
+              _log('File uploaded! ID: ${respJson['file_id']} (${fileBytes.length} bytes)');
+            } else {
+              _log('File upload failed (${response.statusCode}): $respBody');
+            }
+          }
+        } catch (e) {
+          _log('Failed to upload result file $fileName: $e');
+        }
+      }
+
+      _sync?.sendResult(executionId, success: true, output: finalOutput);
       _log('Task $executionId succeeded.');
       wasmEvent.success = true;
-      wasmEvent.output = result;
-      history.insert(0, ExecutionRecord(
-        executionId: executionId,
-        lambdaId: lambdaId,
-        success: true,
-        message: 'Success',
-      ));
+      wasmEvent.output = finalOutput;
+      history.insert(
+        0,
+        ExecutionRecord(
+          executionId: executionId,
+          lambdaId: lambdaId,
+          success: true,
+          message: 'Success',
+        ),
+      );
       executionSuccess++;
     } on PlatformException catch (e) {
       final msg = e.message ?? 'Native error';
@@ -235,24 +285,75 @@ class NodeController extends ChangeNotifier {
       _log('Task $executionId FAILED: $msg');
       wasmEvent.success = false;
       wasmEvent.errorMessage = msg;
-      history.insert(0, ExecutionRecord(
-        executionId: executionId,
-        lambdaId: lambdaId,
-        success: false,
-        message: msg,
-      ));
+      history.insert(
+        0,
+        ExecutionRecord(
+          executionId: executionId,
+          lambdaId: lambdaId,
+          success: false,
+          message: msg,
+        ),
+      );
       executionFailed++;
     } catch (e) {
       _sync?.sendResult(executionId, success: false, error: e.toString());
       _log('Task $executionId ERROR: $e');
       wasmEvent.success = false;
       wasmEvent.errorMessage = e.toString();
-      history.insert(0, ExecutionRecord(
-        executionId: executionId,
-        lambdaId: lambdaId,
-        success: false,
-        message: e.toString(),
-      ));
+      history.insert(
+        0,
+        ExecutionRecord(
+          executionId: executionId,
+          lambdaId: lambdaId,
+          success: false,
+          message: e.toString(),
+        ),
+      );
+      executionFailed++;
+    } finally {
+      _setStatus(isConnected ? NodeStatus.online : NodeStatus.idle);
+      notifyListeners();
+    }
+  }
+
+  Future<void> testFetchAndPdf() async {
+    _setStatus(NodeStatus.executing);
+    _log('Testing Fetch & PDF conversion...');
+
+    try {
+      // 1. Read test_fetch.wasm from local storage
+      final bytes = await _platform.invokeMethod<Uint8List>('readLocalFile', {
+        'name': 'test_fetch.wasm',
+      });
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Failed to read test_fetch.wasm — did you push it?');
+      }
+
+      _log('Read ${bytes.length} bytes of WASM. Invoking...');
+
+      // 2. Clear payload
+      final payload = Uint8List(0);
+
+      // 3. Call invokeDataWasm
+      final pdfBytes = await _platform
+          .invokeMethod<Uint8List>('invokeDataWasm', {
+            'bytes': bytes,
+            'funcName': 'wasm_main',
+            'payload': payload,
+            'hostPath': 'test_fetch.wasm',
+          });
+
+      if (pdfBytes != null && pdfBytes.length > 5) {
+        _log('SUCCESS! Generated ${pdfBytes.length} byte PDF.');
+        final header = String.fromCharCodes(pdfBytes.take(4));
+        _log('PDF Header: $header');
+        executionSuccess++;
+      } else {
+        _log('Failed or returned invalid data: ${pdfBytes?.length ?? 0} bytes');
+        executionFailed++;
+      }
+    } catch (e) {
+      _log('Test Error: $e');
       executionFailed++;
     } finally {
       _setStatus(isConnected ? NodeStatus.online : NodeStatus.idle);
