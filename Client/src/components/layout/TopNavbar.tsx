@@ -9,12 +9,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface TopNavbarProps {
   onLogout?: () => void;
 }
 
 export function TopNavbar({ onLogout }: TopNavbarProps) {
+  const { session } = useAuth();
+  
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-12 bg-surface border-b border-border">
       <div className="flex items-center justify-between h-full px-4">
@@ -76,8 +79,8 @@ export function TopNavbar({ onLogout }: TopNavbarProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <div className="px-2 py-1.5">
-                <p className="text-sm font-medium">John Doe</p>
-                <p className="text-xs text-muted-foreground">john@example.com</p>
+                <p className="text-sm font-medium truncate">{session?.email || "User"}</p>
+                <p className="text-xs text-muted-foreground truncate">{session?.email || "No email"}</p>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
