@@ -10,6 +10,7 @@ Thumbs.db
 # IDE and Tooling
 .vscode/
 .idea/
+.venv/
 *.swp
 *.swo
 *.sublime-project
