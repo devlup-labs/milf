@@ -100,6 +100,12 @@ func (s *SinkManagerService) RegisterSink(ctx context.Context, req *domain.SinkR
 
 	existing, _ := s.sinkRepo.FindByEmail(ctx, req.Email)
 	if existing != nil {
+		if bcrypt.CompareHashAndPassword([]byte(existing.Password), []byte(req.Password)) == nil {
+			return &domain.SinkRegisterResponse{
+				SinkID:  existing.ID,
+				Message: "Sink already registered, returning existing ID",
+			}, nil
+		}
 		return nil, domain.ErrSinkAlreadyExists
 	}
 
