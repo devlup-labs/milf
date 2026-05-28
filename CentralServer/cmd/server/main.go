@@ -47,30 +47,37 @@ func main() {
 	godotenv.Overload(".env")
 
 	// Load database configuration from environment variables
-	dbHost := os.Getenv("DB_HOST")
-	if dbHost == "" {
-		dbHost = "localhost"
-	}
-	dbPort := os.Getenv("DB_PORT")
-	if dbPort == "" {
-		dbPort = "5432"
-	}
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = "central_server_db"
-	}
-	dbUser := os.Getenv("DB_USER")
-	if dbUser == "" {
-		dbUser = "postgres"
-	}
-	dbPassword := os.Getenv("DB_PASSWORD")
-	if dbPassword == "" {
-		log.Fatal("DB_PASSWORD environment variable not set")
-	}
+	connString := os.Getenv("DATABASE_URL")
+	if connString == "" {
+		dbHost := os.Getenv("DB_HOST")
+		if dbHost == "" {
+			dbHost = "localhost"
+		}
+		dbPort := os.Getenv("DB_PORT")
+		if dbPort == "" {
+			dbPort = "5432"
+		}
+		dbName := os.Getenv("DB_NAME")
+		if dbName == "" {
+			dbName = "central_server_db"
+		}
+		dbUser := os.Getenv("DB_USER")
+		if dbUser == "" {
+			dbUser = "postgres"
+		}
+		dbPassword := os.Getenv("DB_PASSWORD")
+		if dbPassword == "" {
+			log.Fatal("DB_PASSWORD environment variable not set when DATABASE_URL is empty")
+		}
+		dbSSLMode := os.Getenv("DB_SSLMODE")
+		if dbSSLMode == "" {
+			dbSSLMode = "disable"
+		}
 
-	// Build connection string
-	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		dbUser, dbPassword, dbHost, dbPort, dbName)
+		// Build connection string
+		connString = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
+			dbUser, dbPassword, dbHost, dbPort, dbName, dbSSLMode)
+	}
 
 	// Auth - Connect to PostgreSQL
 	userRepo, err := storage.NewPostgresUserRepo(connString)
@@ -255,7 +262,11 @@ func main() {
 	mux.HandleFunc("POST /api/v1/files", fileStore.HandleUpload)
 	mux.HandleFunc("GET /api/v1/files/{id}", fileStore.HandleDownload)
 
-	addr := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := ":" + port
 	log.Printf("server listening on %s", addr)
 	if err := http.ListenAndServe(addr, cors(mux)); err != nil {
 		log.Fatalf("server failed: %v", err)

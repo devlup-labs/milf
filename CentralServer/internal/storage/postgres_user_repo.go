@@ -28,27 +28,17 @@ func NewPostgresUserRepo(connString string) (*PostgresUserRepo, error) {
 		return nil, err
 	}
 
-	// Create table if not exists
-	if err := createUserTable(db); err != nil {
+	// Initialize tables if they do not exist
+	if err := initializeSchema(db); err != nil {
 		return nil, err
 	}
 
 	return &PostgresUserRepo{db: db}, nil
 }
 
-// createUserTable creates the users table if it doesn't exist
-func createUserTable(db *sql.DB) error {
-	query := `
-	CREATE TABLE IF NOT EXISTS users (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		username VARCHAR(255) UNIQUE NOT NULL,
-		password_hash VARCHAR(255) NOT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
-	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-	`
-	_, err := db.Exec(query)
+// initializeSchema executes the SQL schema definition to create all tables
+func initializeSchema(db *sql.DB) error {
+	_, err := db.Exec(InitSchema)
 	return err
 }
 

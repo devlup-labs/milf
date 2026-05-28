@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useFunction, useInvokeFunction, useLogs, useDeleteFunction, useExecution, usePauseSchedule, useResumeSchedule, useScheduleStatus } from "@/hooks/useQueries";
 import { useToast } from "@/hooks/use-toast";
 import { InvokeModal } from "@/components/InvokeModal";
+import { API_BASE_URL } from "@/lib/api";
 
 // Safe date formatter that handles invalid dates
 function formatSafeTimestamp(timestamp?: string): string {
@@ -399,7 +400,7 @@ export default function FunctionDetail() {
                       try { output = JSON.parse(output); } catch(e) {}
                     }
                     if (executionResult?.status === "completed" && output?.download_url) {
-                      const downloadHref = `http://localhost:8080${output.download_url}`;
+                      const downloadHref = `${API_BASE_URL}${output.download_url}`;
                       return (
                        <div className="p-6 flex flex-col items-center border-t border-border bg-emerald-500/5">
                           <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-3">

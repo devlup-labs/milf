@@ -110,7 +110,12 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 	}
 
 	// ALSO Save a copy to the local generated_wasm folder for easy access
-	localPath := fmt.Sprintf("/Users/adarsh/Projects/devlup/milf/generated_wasm/%s.wasm", req.LambdaID)
+	localDir := os.Getenv("GENERATED_WASM_DIR")
+	if localDir == "" {
+		localDir = "./generated_wasm"
+	}
+	_ = os.MkdirAll(localDir, 0755)
+	localPath := filepath.Join(localDir, fmt.Sprintf("%s.wasm", req.LambdaID))
 	_ = os.WriteFile(localPath, wasmBytes, 0644)
 
 	// ---- STORE METADATA STAGE ----
