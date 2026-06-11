@@ -1,0 +1,70 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-linux:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout PDFio sources
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+    - name: Update Build Environment
+      run: sudo apt-get update --fix-missing -y
+    - name: Install Prerequisites
+      run: sudo apt-get install -y cppcheck zlib1g-dev libpng-dev
+    - name: Configure PDFio
+      run: ./configure --enable-debug --enable-sanitizer --enable-maintainer
+    - name: Build PDFio
+      run: make
+    - name: Test PDFio
+      env:
+        ASAN_OPTIONS: leak_check_at_exit=false
+      run: make test
+    - name: Run Clang Static Analyzer
+      run: make CC=clang "GHA_ERROR=::error::" clang
+    - name: Run cppcheck
+      run: make "GHA_ERROR=::error::" cppcheck
+
+  build-macos:
+
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout PDFio sources
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+    - name: Configure PDFio
+      run: ./configure --enable-debug --enable-sanitizer --enable-maintainer
+    - name: Build PDFio
+      run: make "COMMONFLAGS=-g -fsanitize=address"
+    - name: Test PDFio
+      run: make test
+    - name: Run Clang Static Analyzer
+      run: make CC=clang "GHA_ERROR=::error::" clang
+
+  build-windows:
+
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout PDFio sources
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+    - name: Nuget Restore
+      run: nuget restore pdfio.sln
+    - name: Build PDFio
+      run: msbuild pdfio.sln
+    - name: Test PDFio
+      run: .\runtests.bat x64\Debug

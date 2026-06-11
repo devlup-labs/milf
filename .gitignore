@@ -1,0 +1,75 @@
+# General OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Tooling
+.vscode/
+.idea/
+.venv/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# Project Metadata & Local Scratch Files
+plan.json
+progress
+temp/
+tmp/
+*.orig
+*.bak
+
+# --- CentralServer (Go) ---
+CentralServer/.env
+CentralServer/server
+# Go binaries and build artifacts
+CentralServer/bin/
+CentralServer/*.exe
+CentralServer/*.test
+CentralServer/*.out
+
+# --- Client (React/Vite) ---
+Client/node_modules/
+Client/dist/
+Client/build/
+Client/.env
+Client/.env.local
+Client/.env.*.local
+
+# --- consumeronlywamr (Flutter) ---
+consumeronlywamr/.dart_tool/
+consumeronlywamr/.flutter-plugins
+consumeronlywamr/.flutter-plugins-dependencies
+consumeronlywamr/.metadata
+consumeronlywamr/.packages
+consumeronlywamr/.pub-cache/
+consumeronlywamr/build/
+# Any WASM files (compiled binaries)
+**/*.wasm
+# Generated PDFs and downloads
+consumeronlywamr/server/downloads/*.pdf
+consumeronlywamr/test/*.wasm
+# Generated android/ios/windows stuff
+consumeronlywamr/android/app/debug/
+consumeronlywamr/android/app/profile/
+consumeronlywamr/android/app/release/
+consumeronlywamr/ios/Flutter/Generated.xcconfig
+consumeronlywamr/ios/Flutter/flutter_export_environment.sh
+consumeronlywamr/windows/flutter/ephemeral/
+
+# Generic logs and DBs
+*.log
+*.db
+*.sqlite
+logs/
+node_modules/
+temp/
+CentralServer/wasi-sdk-24.0-arm64-macos/
