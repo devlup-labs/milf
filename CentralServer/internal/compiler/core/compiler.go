@@ -5,6 +5,7 @@ import (
 	"central_server/internal/compiler/interfaces"
 	gwdomain "central_server/internal/gateway/domain"
 	gwinterfaces "central_server/internal/gateway/interfaces"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type Compiler struct {
@@ -20,6 +22,7 @@ type Compiler struct {
 	queue        *gwdomain.CompilationQueue
 	orchestrator gwinterfaces.OrchestratorService
 	clangPath    string
+	logRepo      gwdomain.LogRepository
 }
 
 func NewCompiler(
@@ -27,6 +30,7 @@ func NewCompiler(
 	trigger interfaces.RunTrigger,
 	queue *gwdomain.CompilationQueue,
 	orchestrator gwinterfaces.OrchestratorService,
+	logRepo gwdomain.LogRepository,
 ) *Compiler {
 	// Try common locations if no path provided
 	defaultPath := "/opt/wasi-sdk/bin/clang"
@@ -40,6 +44,7 @@ func NewCompiler(
 		queue:        queue,
 		orchestrator: orchestrator,
 		clangPath:    defaultPath,
+		logRepo:      logRepo,
 	}
 }
 
@@ -67,12 +72,30 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 	req, err := c.objectStore.FetchCompilationRequest(lambdaID)
 	if err != nil {
 		ce := newCompilationError(lambdaID, "fetch", err)
+		if c.logRepo != nil {
+			_ = c.logRepo.Insert(context.Background(), &gwdomain.LogEntry{
+				RequestID:    "COMPILATION",
+				FunctionName: lambdaID,
+				Level:        "error",
+				Message:      fmt.Sprintf("Compilation fetch failed: %s", ce.Message),
+				Timestamp:    time.Now(),
+			})
+		}
 		return nil, &ce
 	}
 
 	// ---- VALIDATE STAGE ----
 	if err := req.Validate(); err != nil {
 		ce := newCompilationError(req.LambdaID, "validate", err)
+		if c.logRepo != nil {
+			_ = c.logRepo.Insert(context.Background(), &gwdomain.LogEntry{
+				RequestID:    "COMPILATION",
+				FunctionName: req.LambdaID,
+				Level:        "error",
+				Message:      fmt.Sprintf("Compilation validation failed: %s", ce.Message),
+				Timestamp:    time.Now(),
+			})
+		}
 		return nil, &ce
 	}
 
@@ -99,6 +122,15 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 
 	if err != nil {
 		ce := newCompilationError(req.LambdaID, "build", err)
+		if c.logRepo != nil {
+			_ = c.logRepo.Insert(context.Background(), &gwdomain.LogEntry{
+				RequestID:    "COMPILATION",
+				FunctionName: req.LambdaID,
+				Level:        "error",
+				Message:      fmt.Sprintf("Compilation failed: %s", ce.Message),
+				Timestamp:    time.Now(),
+			})
+		}
 		return nil, &ce
 	}
 
@@ -106,6 +138,15 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 	err = c.objectStore.StoreWasm(req.LambdaID, wasmBytes)
 	if err != nil {
 		ce := newCompilationError(req.LambdaID, "store", err)
+		if c.logRepo != nil {
+			_ = c.logRepo.Insert(context.Background(), &gwdomain.LogEntry{
+				RequestID:    "COMPILATION",
+				FunctionName: req.LambdaID,
+				Level:        "error",
+				Message:      fmt.Sprintf("Compilation store failed: %s", ce.Message),
+				Timestamp:    time.Now(),
+			})
+		}
 		return nil, &ce
 	}
 
@@ -127,6 +168,15 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 	err = c.objectStore.StoreMetadata(req.LambdaID, meta)
 	if err != nil {
 		ce := newCompilationError(req.LambdaID, "store", err)
+		if c.logRepo != nil {
+			_ = c.logRepo.Insert(context.Background(), &gwdomain.LogEntry{
+				RequestID:    "COMPILATION",
+				FunctionName: req.LambdaID,
+				Level:        "error",
+				Message:      fmt.Sprintf("Compilation metadata store failed: %s", ce.Message),
+				Timestamp:    time.Now(),
+			})
+		}
 		return nil, &ce
 	}
 
@@ -135,8 +185,28 @@ func (c *Compiler) Compile(lambdaID string) ([]byte, *domain.CompilationError) {
 		err := c.trigger.TriggerRun(req.LambdaID)
 		if err != nil {
 			ce := newCompilationError(req.LambdaID, "trigger", err)
+			if c.logRepo != nil {
+				_ = c.logRepo.Insert(context.Background(), &gwdomain.LogEntry{
+					RequestID:    "COMPILATION",
+					FunctionName: req.LambdaID,
+					Level:        "error",
+					Message:      fmt.Sprintf("Compilation trigger failed: %s", ce.Message),
+					Timestamp:    time.Now(),
+				})
+			}
 			return nil, &ce
 		}
+	}
+
+	// SUCCESS LOG
+	if c.logRepo != nil {
+		_ = c.logRepo.Insert(context.Background(), &gwdomain.LogEntry{
+			RequestID:    "COMPILATION",
+			FunctionName: req.LambdaID,
+			Level:        "info",
+			Message:      "Compilation successful.",
+			Timestamp:    time.Now(),
+		})
 	}
 
 	return wasmBytes, nil

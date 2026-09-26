@@ -1,3 +1,36 @@
+/**
+ * ============================================================================
+ * native-lib.cpp: Native JNI Bridge for WAMR & Android OS Capabilities
+ * ============================================================================
+ *
+ * Architecture & Research Overview:
+ * 1. Process Isolation & Security Sandboxing:
+ *    - Executes entirely within the `:wasm_engine` process (enforced via AndroidManifest.xml).
+ *    - Untrusted guest WASM bytecode executes in a memory-isolated sandbox.
+ *    - Memory faults, divide-by-zero, stack overflows, or WASM traps are caught by
+ *      WAMR's signal handler / exception subsystem without affecting the main UI process.
+ *
+ * 2. Memory Architecture & Address Translation:
+ *    - Guest WebAssembly operates on an indexed linear memory model (32-bit offsets).
+ *    - Host code cannot dereference guest pointers directly:
+ *      * Pointers must be validated via `wasm_runtime_validate_app_addr`.
+ *      * Linear memory addresses are converted to host virtual addresses using
+ *        `wasm_runtime_addr_app_to_native`.
+ *    - Memory transfers use NIO Direct ByteBuffers (`NewDirectByteBuffer`) to eliminate
+ *      user-space copy overhead during high-throughput network streaming.
+ *
+ * 3. WAMR Allocation Model:
+ *    - Configured with `Alloc_With_System_Allocator`, utilizing Android's Scudo/jemalloc
+ *      allocators rather than pre-allocated fixed memory pools. This allows memory pages
+ *      to be committed on demand and returned to the OS under pressure.
+ *
+ * 4. JNI Thread Synchronization:
+ *    - Caches global `JavaVM*` pointer across threads.
+ *    - Background threads initiated by WAMR or POSIX tasks attach dynamically to ART
+ *      using `AttachCurrentThread` to execute host callbacks safely.
+ * ============================================================================
+ */
+
 #include "execution_monitor.h"
 #include "memory_tracker.h"
 #include "wasm_export.h"
@@ -13,6 +46,10 @@
 
 static JavaVM *g_jvm = NULL;
 
+/**
+ * Invoked by ART during `System.loadLibrary("native-lib")`.
+ * Caches the invocation JavaVM interface pointer for asynchronous thread attachment.
+ */
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
   g_jvm = vm;
   LOGI("JNI_OnLoad called");
@@ -24,10 +61,19 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
   return JNI_VERSION_1_6;
 }
 
-// --- Host Functions for Networking ---
+// --- Host Functions for Networking & File I/O ---
 static jobject g_http_streamer = NULL;
 static jclass g_http_streamer_class = NULL;
 
+/**
+ * Retrieves or attaches a thread-local JNIEnv pointer.
+ *
+ * Research Rationale:
+ * - JNIEnv pointers are strictly thread-local in the Android ART runtime.
+ * - If a WASM host call is dispatched from a POSIX background worker thread,
+ *   `GetEnv` returns `JNI_EDETACHED`, requiring `AttachCurrentThread` before
+ *   any JNI methods can be safely invoked.
+ */
 JNIEnv* getEnv() {
     JNIEnv *env;
     if (!g_jvm) return NULL;
@@ -39,6 +85,12 @@ JNIEnv* getEnv() {
     return env;
 }
 
+/**
+ * Host Import: milf_stream_open
+ *
+ * Signature: "($)i" -> Takes string URL from WASM linear memory, returns stream handle.
+ * Invoked when guest WASM requests an HTTPS stream.
+ */
 extern "C" int native_milf_stream_open(wasm_exec_env_t exec_env, const char* url) {
     LOGI("native_milf_stream_open called with mapped URL: %p", url);
 
@@ -67,6 +119,23 @@ extern "C" int native_milf_stream_open(wasm_exec_env_t exec_env, const char* url
     return handle;
 }
 
+/**
+ * Host Import: milf_stream_read
+ *
+ * Signature: "(iii)i" -> Takes handle, guest buffer offset, chunk size; returns bytes read.
+ *
+ * Research & Zero-Copy Architecture:
+ * 1. Sandboxed Bounds Verification:
+ *    - `wasm_runtime_validate_app_addr` verifies that `[buf_offset, buf_offset + chunk_size)`
+ *      resides entirely within the module instance's allocated linear memory.
+ *    - Prevents buffer overflow and memory corruption attacks originating inside WASM.
+ * 2. Address Translation:
+ *    - `wasm_runtime_addr_app_to_native` converts guest 32-bit linear offset into host address.
+ * 3. Zero-Copy I/O Transfer:
+ *    - Wraps `native_buf` in a `DirectByteBuffer` via `NewDirectByteBuffer`.
+ *    - Kotlin reads network socket packets directly into WASM linear memory with zero
+ *      intermediate memory copies.
+ */
 extern "C" int native_milf_stream_read(wasm_exec_env_t exec_env, int handle, uint32_t buf_offset, uint32_t chunk_size) {
     wasm_module_inst_t module_inst = wasm_runtime_get_module_inst(exec_env);
     if (!wasm_runtime_validate_app_addr(module_inst, buf_offset, chunk_size)) {
@@ -83,6 +152,11 @@ extern "C" int native_milf_stream_read(wasm_exec_env_t exec_env, int handle, uin
     return bytes_read;
 }
 
+/**
+ * Host Import: milf_stream_close
+ *
+ * Signature: "(i)" -> Releases handle and underlying socket connections.
+ */
 extern "C" void native_milf_stream_close(wasm_exec_env_t exec_env, int handle) {
     JNIEnv* env = getEnv();
     if (!env || !g_http_streamer || !g_http_streamer_class) return;
@@ -90,6 +164,12 @@ extern "C" void native_milf_stream_close(wasm_exec_env_t exec_env, int handle) {
     env->CallVoidMethod(g_http_streamer, mid, handle);
 }
 
+/**
+ * Host Import: milf_pdf_generate
+ *
+ * Signature: "($*~)i" -> Takes string text, output buffer pointer, max capacity.
+ * Delegates document rendering to Android native graphics engine (`android.graphics.pdf.PdfDocument`).
+ */
 extern "C" int native_milf_pdf_generate(wasm_exec_env_t exec_env, const char* text, void* target_buf, uint32_t max_len) {
     JNIEnv* env = getEnv();
     if (!env || !g_http_streamer || !g_http_streamer_class) return -1;
@@ -115,6 +195,11 @@ extern "C" int native_milf_pdf_generate(wasm_exec_env_t exec_env, const char* te
     return (int)pdf_len;
 }
 
+/**
+ * Host Import: milf_storage_save
+ *
+ * Signature: "($*~)i" -> Persists binary payload to host app internal storage.
+ */
 extern "C" int native_milf_storage_save(wasm_exec_env_t exec_env, const char* name, void* data, uint32_t len) {
     JNIEnv* env = getEnv();
     if (!env || !g_http_streamer || !g_http_streamer_class) return -1;
@@ -131,6 +216,18 @@ extern "C" int native_milf_storage_save(wasm_exec_env_t exec_env, const char* na
     return result;
 }
 
+/**
+ * Native Symbol Export Table for WAMR:
+ *
+ * WAMR Type Signature Grammar:
+ * - 'i': 32-bit int
+ * - 'I': 64-bit int
+ * - 'f': 32-bit float
+ * - 'F': 64-bit float
+ * - '$': string pointer (const char*)
+ * - '*': raw pointer (void*)
+ * - '~': buffer length
+ */
 static NativeSymbol native_symbols[] = {
     {"milf_stream_open", (void *)native_milf_stream_open, "($)i", NULL},
     {"milf_stream_read", (void *)native_milf_stream_read, "(iii)i", NULL},
@@ -139,8 +236,17 @@ static NativeSymbol native_symbols[] = {
     {"milf_storage_save", (void *)native_milf_storage_save, "($*~)i", NULL}
 };
 
-// Now using system allocator for dynamic memory!
-
+/**
+ * JNI Endpoint: initWasm
+ *
+ * Runtime Initialization Research:
+ * - Alloc_With_System_Allocator: Configures WAMR to delegate memory allocations to the
+ *   OS system allocator (Android jemalloc/scudo) instead of a fixed memory pool.
+ *   This avoids allocating a massive contiguous physical memory block up-front,
+ *   enabling efficient dynamic RAM reclamation under mobile memory pressure.
+ * - Registers host symbols under the "env" namespace so WASM modules can link against
+ *   custom host imports during instantiation.
+ */
 extern "C" JNIEXPORT jint JNICALL
 Java_com_example_consumeronlywamr_WasmService_initWasm(JNIEnv *env,
                                                        jobject /* this */) {
@@ -162,7 +268,7 @@ Java_com_example_consumeronlywamr_WasmService_initWasm(JNIEnv *env,
     return -1;
   }
 
-  // Register Native Host functions
+  // Register Native Host functions under "env" module
   if (!wasm_runtime_register_natives("env", native_symbols, sizeof(native_symbols) / sizeof(NativeSymbol))) {
     LOGE("Failed to register native symbols");
     return -1;
@@ -183,6 +289,16 @@ Java_com_example_consumeronlywamr_HttpStreamer_bindNative(JNIEnv *env, jobject s
     env->DeleteLocalRef(cls);
 }
 
+/**
+ * JNI Endpoint: runWasm
+ *
+ * Standalone Execution Pipeline:
+ * 1. Bytecode Ingestion: Extracts byte array from JVM into contiguous native buffer.
+ * 2. Pre-flight Watchdog Check: Aborts if `MemoryTracker::IsNearLimit()` reports high RSS.
+ * 3. Module Instantiation: Spawns module instance with 512MB maximum heap, 16MB shadow stack.
+ * 4. Entrypoint Resolution & Execution: Probes entrypoint symbols ("main", "app_main", "_start").
+ * 5. Telemetry & Cleanup: Collects wall-clock duration and peak RSS delta via [ExecutionMonitor].
+ */
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_consumeronlywamr_WasmService_runWasm(JNIEnv *env,
                                                       jobject /* this */,
@@ -444,6 +560,24 @@ Java_com_example_consumeronlywamr_WasmService_wasmAdd(JNIEnv *env, jobject,
 
   return result;
 }
+/**
+ * JNI Endpoint: invokeWasm
+ *
+ * Dynamic Symbol Dispatcher:
+ * - Allows calling arbitrary exported WebAssembly functions with variable integer parameters.
+ *
+ * Systems & ABI Research:
+ * 1. Fallback Lookup Chain:
+ *    If the requested function symbol is absent, attempts standard CLI entrypoints
+ *    (`main` -> `app_main` -> `_start`) to support modules compiled under varying toolchains.
+ * 2. Signature Validation:
+ *    Uses `wasm_func_get_param_count` to query the WASM type section. If the caller provided
+ *    more or fewer arguments than the export expects, aligns `actualArgCount` to avoid
+ *    corrupting WAMR's operand stack.
+ * 3. In-Place Word Array (`argv`):
+ *    WAMR's calling convention (`wasm_runtime_call_wasm`) uses `argv` for both inputs and
+ *    return values. Output from the WASM function is read directly from `argv[0]`.
+ */
 extern "C" JNIEXPORT jint JNICALL
 Java_com_example_consumeronlywamr_WasmService_invokeWasm(JNIEnv *env, jobject,
                                                          jbyteArray wasmBytes,
@@ -572,6 +706,27 @@ cleanup:
   return result;
 }
 
+/**
+ * JNI Endpoint: invokeDataWasmNative
+ *
+ * Universal Binary ABI Dispatcher:
+ * Designed for complex workloads (e.g., image transformations, PDF rendering, binary protocol parsing).
+ *
+ * Systems Architecture & ABI Research:
+ * 1. Guest Dynamic Allocation:
+ *    - Uses `wasm_runtime_module_malloc` to invoke the guest module's exported `malloc`.
+ *    - This reserves buffer regions within the guest's own linear heap rather than the host's stack.
+ * 2. Inbound Data Transfer:
+ *    - Marshals Android raw bytes into `in_ptr` inside the WASM sandbox.
+ * 3. Outbound Memory Reservation:
+ *    - Pre-allocates up to 10 MB in the module instance (`out_ptr`) to receive generated output.
+ * 4. Standard C Function Signature:
+ *    - Signature: `int handler(uint8_t *in, uint32_t in_len, uint8_t *out, uint32_t out_max)`
+ *    - Returns exact byte count of valid output written to `out`.
+ * 5. Sandbox Memory Hygiene:
+ *    - Explicitly frees `in_ptr` and `out_ptr` via `wasm_runtime_module_free` to prevent
+ *      fragmenting the module instance's linear heap.
+ */
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_example_consumeronlywamr_WasmService_invokeDataWasmNative(
     JNIEnv *env, jobject, jbyteArray wasmBytes, jstring funcName,
@@ -719,6 +874,26 @@ cleanup:
   return resultByteArray;
 }
 
+/**
+ * JNI Endpoint: invokeWasmString
+ *
+ * UTF-8 String & JSON Payload Dispatcher:
+ * Designed for REST/JSON-like serverless invocations (e.g. AWS Lambda-style payloads).
+ *
+ * Systems Architecture & ABI Research:
+ * 1. String Marshaling:
+ *    - Copies UTF-8 characters from Java into linear memory with null-terminator safety (`payload_len + 1`).
+ * 2. C Export Calling Convention:
+ *    - Signature: `int wasm_main(char* payload, int payload_len, char* out_buf, int out_max)`
+ *    - `argv[0]`: Input pointer (`in_ptr`)
+ *    - `argv[1]`: Exact payload length without null terminator
+ *    - `argv[2]`: Output buffer pointer (`out_ptr`)
+ *    - `argv[3]`: Max output capacity (2 MB)
+ * 3. Memory Safety & Null Termination:
+ *    - Inspects returned output size: ensures `out_size < out_capacity`.
+ *    - Explicitly inserts null terminator (`\0`) into the native output buffer before passing
+ *      to `env->NewStringUTF`, preventing buffer over-read vulnerabilities.
+ */
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_consumeronlywamr_WasmService_invokeWasmString(
     JNIEnv *env, jobject, jbyteArray wasmBytes, jstring funcName,

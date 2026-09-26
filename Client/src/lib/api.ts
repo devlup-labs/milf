@@ -7,9 +7,24 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
+// Global fetch wrapper to handle 401 Unauthorized errors
+async function customFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401) {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_email");
+    localStorage.removeItem("auth_expires");
+    // Prevent redirect loop if the user is already on the login or signup page
+    if (!window.location.pathname.endsWith("/login") && !window.location.pathname.endsWith("/signup")) {
+      window.location.href = "/login";
+    }
+  }
+  return res;
+}
+
 /* Auth */
 export async function login(username: string, password: string): Promise<{ token: string, username?: string }> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -19,7 +34,7 @@ export async function login(username: string, password: string): Promise<{ token
 }
 
 export async function googleLogin(idToken: string): Promise<{ token: string, username?: string }> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/google`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/auth/google`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id_token: idToken }),
@@ -29,7 +44,7 @@ export async function googleLogin(idToken: string): Promise<{ token: string, use
 }
 
 export async function register(username: string, password: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -44,7 +59,7 @@ export async function createFunction(data: any, token: string): Promise<any> {
     return runtime;
   };
 
-  const res = await fetch(`${API_BASE_URL}/api/v1/functions/create`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/functions/create`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -92,7 +107,7 @@ export async function listFunctions(token: string, search?: string): Promise<any
   const url = new URL(`${API_BASE_URL}/api/v1/lambdas`);
   if (search) url.searchParams.set("q", search);
 
-  const res = await fetch(url, {
+  const res = await customFetch(url, {
     headers: { "Authorization": `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("Fetch functions failed");
@@ -102,7 +117,7 @@ export async function listFunctions(token: string, search?: string): Promise<any
 }
 
 export async function getFunction(id: string, token: string): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/lambdas/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/lambdas/${id}`, {
     headers: { "Authorization": `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("Function not found");
@@ -111,7 +126,7 @@ export async function getFunction(id: string, token: string): Promise<any> {
 }
 
 export async function deleteFunction(id: string, token: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/lambdas/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/lambdas/${id}`, {
     method: "DELETE",
     headers: { "Authorization": `Bearer ${token}` },
   });
@@ -133,7 +148,7 @@ export async function invokeFunction(id: string, input: any, token: string): Pro
     inputObj = input;
   }
 
-  const res = await fetch(`${API_BASE_URL}/api/v1/functions/invoke`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/functions/invoke`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -151,7 +166,7 @@ export async function listInvocations(token: string, query?: { q?: string; statu
   if (query?.q) url.searchParams.set("q", query.q);
   if (query?.status) url.searchParams.set("status", query.status);
 
-  const res = await fetch(url, {
+  const res = await customFetch(url, {
     headers: { "Authorization": `Bearer ${token}` },
   });
   if (!res.ok) return [];
@@ -174,7 +189,7 @@ export async function listInvocations(token: string, query?: { q?: string; statu
 }
 
 export async function getExecution(id: string, token: string): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/executions/${id}`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/executions/${id}`, {
     headers: { "Authorization": `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("Execution not found");
@@ -196,7 +211,7 @@ export async function listLogs(token: string, query?: { q?: string; level?: stri
   const url = new URL(`${API_BASE_URL}/api/v1/logs`);
   if (query?.level && query.level !== "all") url.searchParams.set("level", query.level);
 
-  const res = await fetch(url, {
+  const res = await customFetch(url, {
     headers: { "Authorization": `Bearer ${token}` },
   });
   if (!res.ok) return [];
@@ -227,7 +242,7 @@ export async function listLogs(token: string, query?: { q?: string; level?: stri
 
 /* Scheduler */
 export async function pauseSchedule(id: string, token: string): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/pause`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/pause`, {
     method: "POST",
     headers: { "Authorization": `Bearer ${token}` },
   });
@@ -236,7 +251,7 @@ export async function pauseSchedule(id: string, token: string): Promise<any> {
 }
 
 export async function resumeSchedule(id: string, token: string): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/resume`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/resume`, {
     method: "POST",
     headers: { "Authorization": `Bearer ${token}` },
   });
@@ -245,9 +260,55 @@ export async function resumeSchedule(id: string, token: string): Promise<any> {
 }
 
 export async function getScheduleStatus(id: string, token: string): Promise<{ id: string; paused: boolean }> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/status`, {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/lambdas/${id}/schedule/status`, {
     headers: { "Authorization": `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("Failed to get schedule status");
+  return res.json();
+}
+
+/* Copilot */
+export async function runCopilot(
+  prompt: string,
+  code: string | undefined,
+  token: string
+): Promise<{ insight: string; code: string }> {
+  const userKey = localStorage.getItem("milf_user_gemini_key") || "";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
+  };
+  if (userKey) {
+    headers["X-Gemini-Api-Key"] = userKey;
+  }
+
+  const res = await customFetch(`${API_BASE_URL}/api/v1/copilot`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ prompt, code }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Copilot generation failed");
+  }
+  return res.json();
+}
+
+export async function testCopilotKey(
+  key: string,
+  token: string
+): Promise<{ valid: boolean }> {
+  const res = await customFetch(`${API_BASE_URL}/api/v1/copilot/test-key`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "X-Gemini-Api-Key": key,
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Key validation failed");
+  }
   return res.json();
 }

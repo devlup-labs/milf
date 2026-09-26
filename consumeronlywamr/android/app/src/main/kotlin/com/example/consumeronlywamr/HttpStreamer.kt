@@ -8,13 +8,37 @@ import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
+/**
+ * HttpStreamer
+ *
+ * Host-environment I/O subsystem providing WASM guest modules with Android platform capabilities.
+ *
+ * Architecture Role:
+ * - WebAssembly modules running inside WAMR are sandboxed and lack direct OS networking,
+ *   filesystem, and PDF generation capabilities.
+ * - This class implements the Android host side of custom WAMR native functions
+ *   (e.g., `milf_stream_open`, `milf_stream_read`, `milf_stream_close`, `milf_pdf_generate`).
+ * - Methods in this class are invoked directly from C++ JNI bridge functions defined
+ *   in `native-lib.cpp`.
+ * - Maintains active streams using thread-safe data structures ([ConcurrentHashMap], [AtomicInteger])
+ *   to handle concurrent asynchronous execution from WASM threads safely.
+ */
 class HttpStreamer {
 
     private val activeStreams = ConcurrentHashMap<Int, InputStream>()
     private val activeConnections = ConcurrentHashMap<Int, HttpURLConnection>()
-    private val handleCounter = AtomicInteger(1) // Always positive
+    private val handleCounter = AtomicInteger(1) // Monotonically increasing stream handle ID
 
-    // Called via JNI from C++ (native_milf_stream_open)
+    /**
+     * Opens an HTTPS streaming connection for the given URL.
+     * Invoked from C++: `native_milf_stream_open`.
+     *
+     * Security Constraint:
+     * - Restricts requests strictly to HTTPS.
+     *
+     * @param urlString Target remote URL.
+     * @return Positive integer handle identifying the active stream, or negative error code.
+     */
     fun openStream(urlString: String): Int {
         val policy = android.os.StrictMode.ThreadPolicy.Builder().permitAll().build()
         android.os.StrictMode.setThreadPolicy(policy)
@@ -51,7 +75,19 @@ class HttpStreamer {
         }
     }
 
-    // Called via JNI from C++ (native_milf_stream_read)
+    /**
+     * Reads a chunk of bytes from an open stream handle directly into WASM linear memory.
+     * Invoked from C++: `native_milf_stream_read`.
+     *
+     * Performance:
+     * - Uses [directBuf] (a Direct [ByteBuffer]) allowing native C++ / WAMR to access
+     *   the read payload directly without intermediate user-space buffer copies.
+     *
+     * @param handle Stream identifier returned by [openStream].
+     * @param maxSize Maximum number of bytes to read in this chunk.
+     * @param directBuf Direct NIO buffer backed by WASM module linear memory.
+     * @return Number of bytes read, 0 on EOF, or -1 on error.
+     */
     fun readChunk(handle: Int, maxSize: Int, directBuf: ByteBuffer): Int {
         val stream = activeStreams[handle] ?: return -1
         val tempBlock = ByteArray(maxSize)
@@ -71,7 +107,12 @@ class HttpStreamer {
         }
     }
 
-    // Called via JNI from C++ (native_milf_stream_close)
+    /**
+     * Closes an active stream and releases the underlying HTTP connection.
+     * Invoked from C++: `native_milf_stream_close`.
+     *
+     * @param handle Stream identifier.
+     */
     fun closeStream(handle: Int) {
         try {
             activeStreams[handle]?.close()
@@ -85,7 +126,13 @@ class HttpStreamer {
         }
     }
 
-    // Called via JNI from C++ (native_milf_pdf_generate)
+    /**
+     * Synthesizes a PDF document from raw text on behalf of the WASM workload.
+     * Invoked from C++: `native_milf_pdf_generate`.
+     *
+     * @param text Raw textual content to render into standard A4 PDF pages.
+     * @return Byte array containing standard binary PDF file data.
+     */
     fun generatePdf(text: String): ByteArray {
         try {
             val document = android.graphics.pdf.PdfDocument()
@@ -120,10 +167,21 @@ class HttpStreamer {
     // We need a path. Simple: use private files dir.
     private var baseDir: java.io.File? = null
 
+    /**
+     * Sets base storage root directory (typically context.filesDir).
+     */
     fun setStorageDir(dir: java.io.File) {
         baseDir = dir
     }
 
+    /**
+     * Persists binary data to private app sandbox storage.
+     * Invoked from C++: `native_milf_storage_save`.
+     *
+     * @param name File name within internal storage directory.
+     * @param data Binary payload to write.
+     * @return 0 on success, -1 on failure.
+     */
     fun saveToStorage(name: String, data: ByteArray): Int {
         val dir = baseDir ?: return -1
         try {
@@ -137,6 +195,8 @@ class HttpStreamer {
         }
     }
 
-    // Connect this Kotlin instance to the C++ global JNI references
+    /**
+     * Registers this Kotlin instance with C++ JNI as the active host callbacks handler.
+     */
     external fun bindNative()
 }

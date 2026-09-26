@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { Upload, FileCode, Container, FileUp, FolderUp, X, AlertTriangle, CheckCircle2, Maximize2, Minimize2, Settings, Loader2, Clock, Zap } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Upload, FileCode, Container, FileUp, FolderUp, X, AlertTriangle, CheckCircle2, Maximize2, Minimize2, Settings, Loader2, Clock, Zap, Sparkles, Brain, Bot, Copy, Check, Plus } from "lucide-react";
 
 import { Editor } from "@monaco-editor/react";
 import { AppLayout } from "@/components/layout";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { useCreateFunction } from "@/hooks/useQueries";
+import { useCreateFunction, useCopilot } from "@/hooks/useQueries";
 import { parseZipFile, parseDirectoryFiles } from "@/lib/mock/api";
 import { FunctionEntity } from "@/lib/mock/types";
 
@@ -35,6 +35,7 @@ const STORAGE_KEY = "dark-canvas-create-function-draft";
 
 export default function CreateFunction() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const folderInputRef = useRef<HTMLInputElement>(null);
   const isEditorFullscreen = useRef(false);
@@ -78,9 +79,77 @@ MILF_EXPORT int wasm_main(char* payload, int payload_len, char* out_buf, int out
   const [validationStatus, setValidationStatus] = useState<{ valid: boolean, message: string } | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // Persistence Logic
+  // Copilot State
+  const [showCopilot, setShowCopilot] = useState(true);
+  const [copilotPrompt, setCopilotPrompt] = useState("");
+  const [includeEditorCode, setIncludeEditorCode] = useState(false);
+  const [copilotResult, setCopilotResult] = useState<{ insight: string; code: string } | null>(null);
+  const [copilotError, setCopilotError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copilotMutation = useCopilot();
+
+  const handleRunCopilot = async () => {
+    setCopilotError(null);
+    try {
+      const codeToSend = includeEditorCode ? formData.code : undefined;
+      const res = await copilotMutation.mutateAsync({
+        prompt: copilotPrompt,
+        code: codeToSend,
+      });
+      setCopilotResult(res);
+    } catch (err) {
+      setCopilotError((err as Error).message || "Copilot adaptation failed.");
+    }
+  };
+
+  const handleApplyCopilotCode = () => {
+    if (copilotResult) {
+      updateFormData("code", copilotResult.code);
+      toast({
+        title: "Code Applied",
+        description: "Suggested code has been inserted into the editor.",
+      });
+    }
+  };
+
+  const handleCopyCopilotCode = () => {
+    if (copilotResult) {
+      navigator.clipboard.writeText(copilotResult.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({
+        title: "Code Copied",
+        description: "Code has been copied to your clipboard.",
+      });
+    }
+  };
+
+  // Template pre-fill: if navigated from Demo Functions tab
   useEffect(() => {
-    // ... (previous persistence code)
+    if (searchParams.get("from") === "template") {
+      const templateCode = sessionStorage.getItem("milf-template-code");
+      const templateRuntime = sessionStorage.getItem("milf-template-runtime");
+      const templateName = sessionStorage.getItem("milf-template-name");
+      if (templateCode) {
+        setFormData(prev => ({
+          ...prev,
+          code: templateCode,
+          runtime: templateRuntime || prev.runtime,
+          name: templateName || prev.name,
+        }));
+        // Clear so it doesn't persist on next visit
+        sessionStorage.removeItem("milf-template-code");
+        sessionStorage.removeItem("milf-template-runtime");
+        sessionStorage.removeItem("milf-template-name");
+        toast({
+          title: "Template loaded",
+          description: `"${templateName}" pre-filled in the editor. Give it a name and deploy!`,
+        });
+        return; // skip localStorage restore
+      }
+    }
+    // Persistence Logic — restore saved draft
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -91,6 +160,7 @@ MILF_EXPORT int wasm_main(char* payload, int payload_len, char* out_buf, int out
         console.error("Failed to restore draft", e);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -402,7 +472,19 @@ MILF_EXPORT int wasm_main(char* payload, int payload_len, char* out_buf, int out
               {formData.sourceType === "inline" && (
                 <div className={cn("space-y-2 transition-all", fullscreenState ? "fixed inset-0 z-50 bg-background p-4 flex flex-col" : "")}>
                   <div className="flex items-center justify-between mb-2">
-                    <Label htmlFor="code" className={fullscreenState ? "text-lg font-semibold" : ""}>Code Editor</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="code" className={fullscreenState ? "text-lg font-semibold" : ""}>Code Editor</Label>
+                      <Button
+                        type="button"
+                        variant={showCopilot ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => setShowCopilot(!showCopilot)}
+                        className="gap-1.5 h-7 px-2 text-xs"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
+                        {showCopilot ? "Hide Copilot" : "AI Copilot"}
+                      </Button>
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -412,23 +494,213 @@ MILF_EXPORT int wasm_main(char* payload, int payload_len, char* out_buf, int out
                       {fullscreenState ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                     </Button>
                   </div>
-                  <div className={cn("border border-border/50 rounded-md overflow-hidden", fullscreenState ? "flex-1" : "h-[500px]")}>
-                    <Editor
-                      height="100%"
-                      language={getEditorLanguage()}
-                      value={formData.code}
-                      onChange={(value) => updateFormData("code", value || "")}
-                      theme="vs-dark"
-                      options={{
-                        minimap: { enabled: true },
-                        fontSize: 14,
-                        scrollBeyondLastLine: false,
-                        mouseWheelZoom: true,
-                        automaticLayout: true,
-                        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                        padding: { top: 16 }
-                      }}
-                    />
+                  
+                  <div className={cn("grid grid-cols-1 lg:grid-cols-5 gap-6", fullscreenState ? "flex-1 min-h-0" : "h-[600px]")}>
+                    {/* Editor Panel */}
+                    <div className={cn("border border-border/50 rounded-md overflow-hidden bg-card flex flex-col h-full", 
+                      showCopilot ? "lg:col-span-3" : "lg:col-span-5"
+                    )}>
+                      <div className="flex-1 min-h-0">
+                        <Editor
+                          height="100%"
+                          language={getEditorLanguage()}
+                          value={formData.code}
+                          onChange={(value) => updateFormData("code", value || "")}
+                          theme="vs-dark"
+                          options={{
+                            minimap: { enabled: true },
+                            fontSize: 14,
+                            scrollBeyondLastLine: false,
+                            mouseWheelZoom: true,
+                            automaticLayout: true,
+                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                            padding: { top: 16 }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Copilot Panel */}
+                    {showCopilot && (
+                      <div className="lg:col-span-2 border border-border/50 rounded-md bg-surface flex flex-col overflow-hidden h-full">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-3 border-b border-border/50 bg-muted/20">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <span className="font-semibold text-sm">MILF AI Copilot</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono">WASI C</span>
+                        </div>
+
+                        {/* Chat interface */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="copilot-prompt" className="text-xs font-medium text-muted-foreground">What would you like to build or fix?</Label>
+                            <textarea
+                              id="copilot-prompt"
+                              placeholder="e.g. 'Write a function to read a URL stream and count lines' or 'Fix this code...'"
+                              value={copilotPrompt}
+                              onChange={(e) => setCopilotPrompt(e.target.value)}
+                              className="w-full min-h-[80px] text-sm bg-background border border-border rounded-md p-2 focus:ring-1 focus:ring-primary focus:outline-none resize-none font-sans"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs select-none text-muted-foreground">
+                              <input
+                                type="checkbox"
+                                checked={includeEditorCode}
+                                onChange={(e) => setIncludeEditorCode(e.target.checked)}
+                                className="rounded border-border text-primary focus:ring-primary bg-background h-3.5 w-3.5"
+                              />
+                              <span>Include current editor code</span>
+                            </label>
+
+                            <Button
+                              type="button"
+                              onClick={handleRunCopilot}
+                              disabled={copilotMutation.isPending || !copilotPrompt.trim()}
+                              className="h-8 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/95 flex items-center gap-1.5"
+                            >
+                              {copilotMutation.isPending ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  <span>Adapting...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="h-3 w-3" />
+                                  <span>Ask Copilot</span>
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Copilot Response */}
+                          {copilotMutation.isPending && (
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
+                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                              <div className="text-center space-y-1">
+                                <p className="text-sm font-medium">Generating MILF compatible code</p>
+                                <p className="text-xs text-muted-foreground/80 max-w-[250px] leading-normal">
+                                  Analyzing constraints, replacing standard library references, and injecting milf.h bindings...
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {copilotError && (
+                            <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-xs rounded-md">
+                              {copilotError}
+                            </div>
+                          )}
+
+                          {copilotResult && !copilotMutation.isPending && (
+                            <div className="space-y-4">
+                              {/* Insights Section */}
+                              <div className="bg-primary/5 border border-primary/20 rounded-md p-3.5 space-y-2.5">
+                                <div className="flex items-center gap-1.5 text-primary text-xs font-semibold uppercase tracking-wider">
+                                  <Brain className="h-3.5 w-3.5 shrink-0" />
+                                  <span>AI Insights (MILF Compatibility)</span>
+                                </div>
+                                <div className="text-xs text-foreground/90 space-y-1.5 leading-relaxed">
+                                  {copilotResult.insight.split('\n').map((line, idx) => {
+                                    const cleaned = line.replace(/^[-\*\s]+/, '').trim();
+                                    if (!cleaned) return null;
+                                    return (
+                                      <div key={idx} className="flex items-start gap-2">
+                                        <span className="text-primary select-none mt-0.5">•</span>
+                                        <span>{cleaned}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Code Section */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-muted-foreground">Suggested Code</span>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={handleCopyCopilotCode}
+                                      className="h-7 px-2 text-xs gap-1 hover:bg-muted/50"
+                                    >
+                                      {copied ? (
+                                        <>
+                                          <Check className="h-3 w-3 text-green-500" />
+                                          <span className="text-green-500 font-medium">Copied</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="h-3 w-3" />
+                                          <span>Copy</span>
+                                        </>
+                                      )}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleApplyCopilotCode}
+                                      className="h-7 px-2 text-xs gap-1 border-primary/30 hover:border-primary bg-background hover:bg-primary/5"
+                                    >
+                                      <Plus className="h-3 w-3 text-primary" />
+                                      <span className="text-primary font-medium">Apply to Editor</span>
+                                    </Button>
+                                  </div>
+                                </div>
+                                <pre className="bg-terminal text-foreground p-3.5 rounded-md font-mono text-xs overflow-auto max-h-[250px] border border-border/50 shadow-inner">
+                                  <code>{copilotResult.code}</code>
+                                </pre>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Empty State */}
+                          {!copilotResult && !copilotMutation.isPending && !copilotError && (
+                            <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground/80 space-y-3">
+                              <Bot className="h-10 w-10 text-muted-foreground/30" />
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">Your AI pair programmer is ready</p>
+                                <p className="text-xs text-muted-foreground max-w-[260px] leading-normal">
+                                  Ask Copilot to write standard C code or paste code from anywhere, and it will rewrite it to run in the WASM/WAMR sandbox.
+                                </p>
+                              </div>
+                              <div className="pt-2 flex flex-wrap gap-1.5 justify-center max-w-[280px]">
+                                <button
+                                  type="button"
+                                  onClick={() => setCopilotPrompt("Write a function to generate a PDF report from input data")}
+                                  className="text-[10px] bg-muted/50 hover:bg-muted text-muted-foreground px-2 py-1.5 rounded border border-border/30 hover:border-border transition-all"
+                                >
+                                  Generate PDF
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCopilotPrompt("Write code to fetch a JSON stream and search for a keyword")}
+                                  className="text-[10px] bg-muted/50 hover:bg-muted text-muted-foreground px-2 py-1.5 rounded border border-border/30 hover:border-border transition-all"
+                                >
+                                  Fetch stream
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCopilotPrompt("Adapt standard C memory copying to use milf_memcpy");
+                                    setIncludeEditorCode(true);
+                                  }}
+                                  className="text-[10px] bg-muted/50 hover:bg-muted text-muted-foreground px-2 py-1.5 rounded border border-border/30 hover:border-border transition-all"
+                                >
+                                  Fix memory utilities
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

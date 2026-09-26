@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:path_provider/path_provider.dart';
 
 typedef TaskCallback =
     Future<void> Function({
@@ -24,8 +26,11 @@ Uint8List _decodeTaskInput(Map<String, dynamic>? input) {
   if (input['type'] == 'binary') {
     return base64Decode(input['data'] as String);
   }
-  // Default: treat as JSON → UTF-8 bytes
-  return Uint8List.fromList(utf8.encode(jsonEncode(input['data'] ?? {})));
+  if (input.containsKey('type') && input.containsKey('data')) {
+    return Uint8List.fromList(utf8.encode(jsonEncode(input['data'] ?? {})));
+  }
+  // Default: treat the whole input map as the JSON data
+  return Uint8List.fromList(utf8.encode(jsonEncode(input)));
 }
 
 /// Hardened WebSocket manager for the MILF node.
@@ -70,6 +75,79 @@ class CloudSync {
 
   // ── Registration ──────────────────────────────────────────────────────────
 
+  String? _nodeEmail;
+
+  static const _platform = MethodChannel('com.example.consumeronlywamr/wasm');
+
+  Future<String> _getNodeEmail() async {
+    if (_nodeEmail != null) return _nodeEmail!;
+    try {
+      if (Platform.isAndroid) {
+        final String? deviceId = await _platform.invokeMethod<String>('getDeviceId');
+        if (deviceId != null && deviceId.isNotEmpty && deviceId != 'unknown_device') {
+          _nodeEmail = 'node_$deviceId@milf.local';
+          return _nodeEmail!;
+        }
+      }
+    } catch (e) {
+      onLog('Failed to get device ID from platform channel: $e');
+    }
+
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/node_email.txt');
+      if (await file.exists()) {
+        final saved = await file.readAsString();
+        if (saved.trim().isNotEmpty) {
+          _nodeEmail = saved.trim();
+          return _nodeEmail!;
+        }
+      }
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final random = (100000 + (DateTime.now().microsecondsSinceEpoch % 900000)).toString();
+      _nodeEmail = 'node_${timestamp}_$random@milf.local';
+      await file.writeAsString(_nodeEmail!);
+      return _nodeEmail!;
+    } catch (e) {
+      return 'node_fallback_${DateTime.now().millisecondsSinceEpoch}@milf.local';
+    }
+  }
+
+  Future<void> _login() async {
+    try {
+      onLog('Logging in node with server...');
+      final headers = <String, String>{'Content-Type': 'application/json'};
+
+      final email = await _getNodeEmail();
+      final res = await http.post(
+        Uri.parse('$serverUrl/api/v1/sinks/login'),
+        headers: headers,
+        body: jsonEncode({
+          'email': email,
+          'password': 'unused',
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        _sinkId = data['sink_id'] as String?;
+        if (_sinkId == null) {
+          onLog('Login error: sink_id missing in response');
+          return;
+        }
+        onLog('Logged in. SinkID: $_sinkId');
+        onSinkRegistered(_sinkId!);
+        _openWebSocket();
+      } else {
+        onLog('Login failed (${res.statusCode}): ${res.body}');
+        _scheduleReconnect();
+      }
+    } catch (e) {
+      onLog('Login error: $e');
+      _scheduleReconnect();
+    }
+  }
+
   Future<void> _register() async {
     try {
       onLog('Registering node with server...');
@@ -78,11 +156,12 @@ class CloudSync {
         if (authToken.isNotEmpty) 'Authorization': 'Bearer $authToken',
       };
 
+      final email = await _getNodeEmail();
       final res = await http.post(
         Uri.parse('$serverUrl/api/v1/sinks/register'),
         headers: headers,
         body: jsonEncode({
-          'email': 'node_primary@milf.local',
+          'email': email,
           'password': 'unused',
           'endpoint': 'ws-node',
         }),
@@ -98,6 +177,9 @@ class CloudSync {
         onLog('Registered. SinkID: $_sinkId');
         onSinkRegistered(_sinkId!);
         _openWebSocket();
+      } else if (res.statusCode == 409) {
+        onLog('Sink already registered. Attempting login...');
+        await _login();
       } else {
         onLog('Registration failed (${res.statusCode}): ${res.body}');
         _scheduleReconnect();

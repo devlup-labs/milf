@@ -83,3 +83,11 @@ CREATE TABLE IF NOT EXISTS billing_usage (
 );
 
 CREATE INDEX IF NOT EXISTS idx_billing_usage_user_id ON billing_usage(user_id);
+
+-- Enable Row Level Security (RLS) on all tables to prevent unauthorized public API access
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE functions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE policies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE billing_usage ENABLE ROW LEVEL SECURITY;

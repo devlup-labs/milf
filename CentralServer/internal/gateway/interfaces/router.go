@@ -34,6 +34,8 @@ func (r *Router) Setup() http.Handler {
 	// Gateway (clean) APIs
 	r.mux.HandleFunc("GET /api/v1/lambdas", wrap(r.handler.List))
 	r.mux.HandleFunc("POST /api/v1/lambdas", wrap(r.handler.Store))
+	r.mux.HandleFunc("POST /api/v1/copilot", wrap(r.handler.HandleCopilot))
+	r.mux.HandleFunc("POST /api/v1/copilot/test-key", wrap(r.handler.HandleTestCopilotKey))
 	r.mux.HandleFunc("GET /api/v1/lambdas/{id}", wrap(r.handler.Get))
 	r.mux.HandleFunc("GET /api/v1/lambdas/{id}/wasm", r.handler.GetWasm)
 	r.mux.HandleFunc("DELETE /api/v1/lambdas/{id}", wrap(r.handler.Delete))

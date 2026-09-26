@@ -27,6 +27,7 @@ import (
 	sinkhandler "central_server/internal/sinkManager/handler"
 	sinkinterfaces "central_server/internal/sinkManager/interfaces"
 	"central_server/internal/storage"
+	"path/filepath"
 	"central_server/internal/filestore"
 	"central_server/utils"
 )
@@ -34,9 +35,15 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Setup logging to file and stdout
-	logFile, _ := os.OpenFile("/tmp/milf_server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	multi := io.MultiWriter(os.Stdout, logFile)
+	// Setup logging to file and stdout (cross-platform safe)
+	var logWriters []io.Writer
+	logWriters = append(logWriters, os.Stdout)
+	logPath := filepath.Join(os.TempDir(), "milf_server.log")
+	if logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		defer logFile.Close()
+		logWriters = append(logWriters, logFile)
+	}
+	multi := io.MultiWriter(logWriters...)
 	log.SetOutput(multi)
 	if utils.Logger != nil {
 		utils.Logger.SetOutput(multi)
@@ -111,6 +118,9 @@ func main() {
 	// ObjectStore for Compiler - Use PostgreSQL to fetch from same DB
 	objectStore := storage.NewPostgresObjectStore(userRepo.GetDB())
 
+	// Wire Log Repository (Phase 4: Observability)
+	logRepo := storage.NewPostgresLogRepo(userRepo.GetDB())
+
 	// Trigger for Compiler
 	trigger := &storage.DummyRunTrigger{}
 
@@ -121,7 +131,7 @@ func main() {
 
 	lambdaService := gwcore.NewLambdaService(gatewayDB, compilerRepo, nil, compQueue, executionRepo)
 	orchestrator := orchcore.NewOrchestrator(functionRepo, lambdaService, queueService)
-	compiler := compilercore.NewCompiler(objectStore, trigger, compQueue, orchestrator)
+	compiler := compilercore.NewCompiler(objectStore, trigger, compQueue, orchestrator, logRepo)
 	clangPath := os.Getenv("CLANG_PATH")
 	log.Printf("[Main] Using CLANG_PATH from env: %s", clangPath)
 	if _, err := os.Stat(clangPath); os.IsNotExist(err) {
@@ -139,7 +149,6 @@ func main() {
 	go scheduler.Start(ctx)
 
 	// 4.6 Wire Log Repository (Phase 4: Observability)
-	logRepo := storage.NewPostgresLogRepo(userRepo.GetDB())
 	lambdaService.SetLogRepo(logRepo)
 
 	// 5. Handlers & Routers
@@ -216,7 +225,7 @@ func main() {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Filename")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Filename, X-Gemini-Api-Key")
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return

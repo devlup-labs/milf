@@ -125,15 +125,25 @@ uint64_t ExecutionMonitor::GetCurrentDuration() {
       .count();
 }
 
+/**
+ * Derives an adaptive SLA execution deadline based on structural resource requirements.
+ *
+ * Research Rationale:
+ * - Fixed static timeouts fail on mobile devices due to wide hardware variance:
+ *   a high-end Snapdragon 8 Gen 3 executes 10x faster than an entry-level MediaTek chip.
+ * - By mapping module bytecode size and requested heap allocations into logarithmic tiers,
+ *   we grant compute-intensive lambdas sufficient headroom while promptly failing runaway
+ *   infinite loops on lightweight scripts.
+ */
 uint32_t ExecutionMonitor::EstimateTimeout(uint32_t module_size,
                                            size_t heap_requested) {
   // Timeout estimation based on resources
-  const uint32_t LIGHT_TIMEOUT = 5000;     // 5 seconds
-  const uint32_t MEDIUM_TIMEOUT = 30000;   // 30 seconds
-  const uint32_t HEAVY_TIMEOUT = 120000;   // 2 minutes
-  const uint32_t EXTREME_TIMEOUT = 300000; // 5 minutes
+  const uint32_t LIGHT_TIMEOUT = 5000;     // 5 seconds: Micro-tasks and pure arithmetic
+  const uint32_t MEDIUM_TIMEOUT = 30000;   // 30 seconds: Standard data processing / transformations
+  const uint32_t HEAVY_TIMEOUT = 120000;   // 2 minutes: Image compression, cryptographic hashing
+  const uint32_t EXTREME_TIMEOUT = 300000; // 5 minutes: Heavy ML inference / multi-page PDF generation
 
-  // Heavy workload indicators
+  // Heavy workload indicators based on memory allocation profiles
   bool is_heavy_memory = heap_requested > (200 * 1024 * 1024);   // > 200MB
   bool is_large_module = module_size > (1024 * 1024);            // > 1MB
   bool is_extreme_memory = heap_requested > (400 * 1024 * 1024); // > 400MB

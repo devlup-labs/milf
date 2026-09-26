@@ -6,15 +6,26 @@
 #include <cstdint>
 
 /**
- * Execution Monitor - Tracks WASM execution metrics
+ * ExecutionMonitor
  *
- * Monitors:
- * - Execution time (for timeout detection)
- * - Memory usage (peak RSS)
- * - Function being executed
- * - Result codes
+ * Distributed execution watchdog and telemetry engine for mobile WASM lambdas.
  *
- * Supports heavy workloads with timeout protection
+ * Systems & Architectural Research Context:
+ * 1. Monotonic Timing vs System Wall-Clock:
+ *    - Uses `std::chrono::steady_clock` (backed by Linux `CLOCK_MONOTONIC_RAW`).
+ *    - Guarantees time is strictly non-decreasing and immune to NTP network adjustments,
+ *      device timezone updates, or leap seconds that could cause false timeout triggers.
+ *
+ * 2. Adaptive SLA Heuristics:
+ *    - Unlike cloud functions with static 15-minute caps, mobile edge nodes operate under
+ *      heterogeneous thermal and core throttling constraints (ARM big.LITTLE / DynamIQ).
+ *    - The monitor dynamically models expected latency based on:
+ *      a) Static bytecode size (decoding and JIT/interp parsing overhead).
+ *      b) Requested linear memory pages (paging and page fault servicing overhead).
+ *
+ * 3. Execution Telemetry:
+ *    - Captures RSS memory delta (peak vs baseline) to detect memory leaks across WASM invocations.
+ *    - Emits structured execution metrics for distributed node scheduling.
  */
 class ExecutionMonitor {
 public:

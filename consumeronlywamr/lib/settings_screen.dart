@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'node_controller.dart';
+import 'config.dart';
 
 /// Operator settings screen.
 /// Allows configuring the server URL and auth token without changing code.
@@ -61,7 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _DarkField(
               controller: _urlCtrl,
               label: 'Server URL',
-              hint: 'http://10.0.2.2:8080',
+              hint: defaultServerUrl,
               icon: Icons.dns_outlined,
             ),
             const SizedBox(height: 16),

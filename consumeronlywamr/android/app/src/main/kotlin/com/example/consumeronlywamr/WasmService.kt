@@ -5,10 +5,26 @@ import android.content.Intent
 import android.os.IBinder
 import android.util.Log
 
-// Controller
-
+/**
+ * WasmService
+ *
+ * Dedicated background execution service hosting the WebAssembly Micro Runtime (WAMR).
+ *
+ * Process & Security Architecture:
+ * - Runs in an isolated Linux process (`:wasm_engine`) as declared in AndroidManifest.xml.
+ * - Enforces a security and fault-tolerance boundary: Any memory violations, panics,
+ *   or aborts in untrusted WASM or C++ native code will terminate only this background
+ *   process, preventing the main application and Flutter UI from crashing.
+ * - Implements [WasmServiceInterface.Stub] to expose RPC/IPC endpoints via Android Binder.
+ * - Forwards incoming requests to the native layer (`libnative-lib.so`) via JNI.
+ */
 class WasmService : Service() {
 
+    /**
+     * Service lifecycle initialization:
+     * - Initializes global WAMR runtime environment.
+     * - Configures host imports and streaming I/O via [HttpStreamer].
+     */
     override fun onCreate() {
         super.onCreate()
         // Initialize WASM runtime when service starts
@@ -21,8 +37,15 @@ class WasmService : Service() {
         Log.i("WasmService", "HttpStreamer Native bindings initialized with storage at ${filesDir.absolutePath}")
     }
 
+    /**
+     * AIDL IPC Binder Implementation:
+     * Implements [WasmServiceInterface.Stub] to fulfill remote IPC requests sent by [MainActivity].
+     */
     private val binder =
             object : WasmServiceInterface.Stub() {
+                /**
+                 * Dispatches an exported WASM function by name with integer parameters.
+                 */
                 override fun invokeWasm(
                         wasmBytes: ByteArray?,
                         funcName: String?,
@@ -32,6 +55,9 @@ class WasmService : Service() {
                     return this@WasmService.invokeWasm(wasmBytes, funcName, args)
                 }
 
+                /**
+                 * Passes string payload into WASM linear memory and captures string return value.
+                 */
                 override fun invokeWasmString(
                         wasmBytes: ByteArray?,
                         funcName: String?,
@@ -41,16 +67,24 @@ class WasmService : Service() {
                     return this@WasmService.invokeWasmString(wasmBytes, funcName, payload)
                 }
 
+                /**
+                 * Executes default entrypoint of the given WASM binary, returning runtime logs.
+                 */
                 override fun runWasm(wasmBytes: ByteArray?): String {
                     if (wasmBytes == null) return "Error: Null bytes"
                     return this@WasmService.runWasm(wasmBytes)
                 }
-
+                
+                // just for initial testing no need in the main version 
                 override fun wasmAdd(wasmBytes: ByteArray?, a: Int, b: Int): Int {
                     if (wasmBytes == null) return -1
                     return this@WasmService.wasmAdd(wasmBytes, intArrayOf(a, b))
                 }
 
+                /**
+                 * Universal ABI Dispatcher:
+                 * Passes binary payload into WASM linear memory and returns output byte array.
+                 */
                 override fun invokeDataWasm(
                         wasmBytes: ByteArray?,
                         funcName: String?,
@@ -64,19 +98,36 @@ class WasmService : Service() {
                 }
             }
 
+    /**
+     * Returns the Binder interface token to binding clients ([MainActivity]).
+     */
     override fun onBind(intent: Intent?): IBinder {
         return binder
     }
 
-    // JNI Native methods
+    // =========================================================================
+    // JNI Native Methods (Implemented in cpp/native-lib.cpp)
+    // =========================================================================
+
+    /** Initializes the WAMR runtime engine and memory allocator. */
     external fun initWasm(): Int
+
+    /** Executes module main and returns captured stdout/stderr. */
     external fun runWasm(wasmBytes: ByteArray): String
+
+    /** Legacy smoke-test method: invokes 'add(a, b)' exported symbol. */
     external fun wasmAdd(wasmBytes: ByteArray, args: IntArray): Int
+
+    /** Generic dispatcher: executes funcName with int[] arguments. */
     external fun invokeWasm(wasmBytes: ByteArray, funcName: String, args: IntArray): Int
+
+    /** String dispatcher: passes UTF-8 payload and returns UTF-8 result. */
     external fun invokeWasmString(wasmBytes: ByteArray, funcName: String, payload: String): String
+
     // Removed incorrect override of invokeDataWasm.
     // It should only be implemented in the Stub (binder) or via direct delegation.
 
+    /** Raw buffer ABI: marshals byte array buffers into WASM linear memory. */
     private external fun invokeDataWasmNative(
             wasmBytes: ByteArray?,
             funcName: String?,
@@ -87,6 +138,7 @@ class WasmService : Service() {
     companion object {
         init {
             try {
+                // Load native C++ library containing WAMR and JNI bindings.
                 System.loadLibrary("native-lib")
             } catch (e: UnsatisfiedLinkError) {
                 // Determine if this is a crash or just missing lib

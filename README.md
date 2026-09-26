@@ -49,23 +49,33 @@ Welcome to the team! Follow these steps to set up the project locally on your ma
 
 ### 2. Central Server (Backend)
 The backend handles the REST API, WASM compilation, and websocket connections.
+
+#### Option A: Running with Docker (Recommended for Windows / Mac)
+No need to install Go, Clang, or the WASI SDK locally:
 ```bash
 cd CentralServer
-# 1. Copy the example environment file
+docker build -t milf-server .
+
+# Run with environment variables (e.g. connecting to Postgres or Supabase):
+docker run -d --name milf-central-server \
+  -p 8080:8080 \
+  --env-file .env \
+  milf-server
+```
+
+#### Option B: Running with Native Go
+```bash
+cd CentralServer
+# 1. Copy and configure .env
 cp .env.example .env
 
-# 2. Update .env with your credentials:
-# - Set DB_DSN (e.g., postgres://postgres:password@localhost:5432/milf_functions?sslmode=disable)
-# - Set GOOGLE_CLIENT_ID for Auth
-# - Set JWT_SECRET to a secure random string
-
-# 3. Download Go modules and run the server
-go mod tidy
-# - Set CLANG_PATH to your wasi-sdk clang binary
-#   Example: CLANG_PATH=/opt/wasi-sdk/bin/clang
+# 2. Download Go modules and run
+go mod download
 go run cmd/server/main.go
 ```
-*The server will typically start on `http://localhost:8080`.*
+*The server starts on `http://localhost:8080`.*
+
+> 💡 **Deploying to Cloud (Render)**: See [CentralServer/README.md](./CentralServer/README.md) for step-by-step instructions on deploying the server using Render's Docker Web Service.
 
 ### 3. Client Dashboard (Frontend)
 The web interface for creating and dispatching WASM functions.

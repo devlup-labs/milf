@@ -5,17 +5,29 @@
 #include <cstddef>
 
 /**
- * Memory Tracker - Ensures WASM execution stays within device limits
+ * MemoryTracker
  *
- * Device constraints:
- * - Average: 500MB-1GB
- * - Maximum: 1.5GB (hard limit)
+ * Real-time memory watchdog and quota enforcement subsystem for WASM execution.
  *
- * WASM allocation:
- * - Heap: 512MB (safe within budget)
- * - Stack: 16MB
- * - Total WASM: ~530MB
- * - Leaves ~500MB for system/Flutter
+ * Architectural & OS Research Context:
+ * 1. Android Low Memory Killer Daemon (LMKD):
+ *    - Android kernel monitors memory pressure through memory cgroups (memcg) and psi
+ *      (Pressure Stall Information). When system RAM drops below critical watermarks,
+ *      LMKD terminates processes based on their `oom_score_adj`.
+ *    - While our `:wasm_engine` process is isolated, exceeding ~1.5 GB RSS triggers
+ *      aggressive OOM termination by LMKD.
+ *
+ * 2. Resident Set Size (RSS) vs Virtual Memory Size (VSS):
+ *    - In WebAssembly runtimes, `memory.grow` reserves virtual address space.
+ *    - VSS (Virtual Set Size) includes uncommitted pages that do not consume physical RAM.
+ *    - RSS (Resident Set Size) represents physical RAM pages currently mapped into the
+ *      page tables. Querying `/proc/self/status` (VmRSS) yields true physical memory impact.
+ *
+ * 3. WASM Linear Memory Budgeting:
+ *    - MAX_HEAP_BYTES (512 MB): Upper bound for module instance heap allocation.
+ *    - MAX_STACK_BYTES (16 MB): Shadow execution stack for deep recursion / call frames.
+ *    - WARNING_THRESHOLD (1.0 GB): Soft watermark to throttle incoming tasks.
+ *    - MAX_TOTAL (1.5 GB): Hard ceiling beyond which further module instantiations are aborted.
  */
 class MemoryTracker {
 public:

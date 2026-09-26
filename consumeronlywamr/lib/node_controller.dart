@@ -4,10 +4,12 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_background/flutter_background.dart';
 import 'cloud_sync.dart';
+import 'config.dart';
 
 /// Tracks a single WASM execution for the history log.
-class ExecutionRecord {
+class ExecutionRecord { 
   final String executionId;
   final String lambdaId;
   final bool success;
@@ -51,7 +53,7 @@ class NodeController extends ChangeNotifier {
   static const _platform = MethodChannel('com.example.consumeronlywamr/wasm');
 
   // ── Configuration ─────────────────────────────────────────────────────────
-  String serverUrl = 'http://10.0.2.2:8080';
+  String serverUrl = defaultServerUrl;
   String authToken = '';
 
   // ── Reactive State ────────────────────────────────────────────────────────
@@ -66,6 +68,10 @@ class NodeController extends ChangeNotifier {
   // ── Internal ──────────────────────────────────────────────────────────────
   CloudSync? _sync;
 
+  NodeController() {
+    connect();
+  }
+
   bool get isConnected =>
       status == NodeStatus.online || status == NodeStatus.executing;
 
@@ -77,10 +83,19 @@ class NodeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void connect() {
+  void connect() async {
     if (isConnected) return;
     _setStatus(NodeStatus.connecting);
     _log('Connecting to $serverUrl...');
+
+    if (Platform.isAndroid) {
+      try {
+        final enabled = await FlutterBackground.enableBackgroundExecution();
+        _log('Background execution enabled: $enabled');
+      } catch (e) {
+        _log('Failed to enable background execution: $e');
+      }
+    }
 
     _sync = CloudSync(
       serverUrl: serverUrl,
@@ -102,12 +117,21 @@ class NodeController extends ChangeNotifier {
     _sync!.connect();
   }
 
-  void disconnect() {
+  void disconnect() async {
     _sync?.disconnect();
     _sync = null;
     sinkId = null;
     _setStatus(NodeStatus.idle);
     _log('Disconnected.');
+
+    if (Platform.isAndroid && FlutterBackground.isBackgroundExecutionEnabled) {
+      try {
+        await FlutterBackground.disableBackgroundExecution();
+        _log('Background execution disabled.');
+      } catch (e) {
+        _log('Failed to disable background execution: $e');
+      }
+    }
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
@@ -118,6 +142,7 @@ class NodeController extends ChangeNotifier {
   }
 
   void _log(String msg) {
+    debugPrint('MILF_NODE: $msg');
     final timestamp = DateTime.now();
     final hms =
         '${timestamp.hour.toString().padLeft(2, '0')}:'
@@ -231,7 +256,10 @@ class NodeController extends ChangeNotifier {
         final fileName = result.substring(5);
         _log('Result is a file reference: $fileName. Uploading to server...');
         try {
-          final fileBytes = await _platform.invokeMethod<Uint8List>('readLocalFile', {'name': fileName});
+          final fileBytes = await _platform.invokeMethod<Uint8List>(
+            'readLocalFile',
+            {'name': fileName},
+          );
           if (fileBytes != null && fileBytes.isNotEmpty) {
             // Upload file to server via HTTP POST
             var uploadUrl = '$serverUrl/api/v1/files';
@@ -239,11 +267,13 @@ class NodeController extends ChangeNotifier {
               uploadUrl = uploadUrl.replaceAll('localhost', '10.0.2.2');
             }
             final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
-            request.files.add(http.MultipartFile.fromBytes(
-              'file',
-              fileBytes,
-              filename: fileName,
-            ));
+            request.files.add(
+              http.MultipartFile.fromBytes(
+                'file',
+                fileBytes,
+                filename: fileName,
+              ),
+            );
             final response = await request.send();
             final respBody = await response.stream.bytesToString();
             if (response.statusCode == 201) {
@@ -255,7 +285,9 @@ class NodeController extends ChangeNotifier {
                 'size': respJson['size'],
                 'content_type': respJson['content_type'],
               };
-              _log('File uploaded! ID: ${respJson['file_id']} (${fileBytes.length} bytes)');
+              _log(
+                'File uploaded! ID: ${respJson['file_id']} (${fileBytes.length} bytes)',
+              );
             } else {
               _log('File upload failed (${response.statusCode}): $respBody');
             }

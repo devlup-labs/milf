@@ -30,6 +30,8 @@ tmp/
 # --- CentralServer (Go) ---
 CentralServer/.env
 CentralServer/server
+CentralServer/uploads
+CentralServer/Scratch
 # Go binaries and build artifacts
 CentralServer/bin/
 CentralServer/*.exe
@@ -45,6 +47,7 @@ Client/.env.local
 Client/.env.*.local
 
 # --- consumeronlywamr (Flutter) ---
+consumeronlywamr/lib/config.dart
 consumeronlywamr/.dart_tool/
 consumeronlywamr/.flutter-plugins
 consumeronlywamr/.flutter-plugins-dependencies

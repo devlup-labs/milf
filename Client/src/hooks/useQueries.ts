@@ -200,3 +200,23 @@ export function useScheduleStatus(id: string | undefined) {
     });
 }
 
+export function useCopilot() {
+    const { session } = useAuth();
+    return useMutation({
+        mutationFn: ({ prompt, code }: { prompt: string; code?: string }) => {
+            if (!session?.token) throw new Error("Not authenticated");
+            return api.runCopilot(prompt, code, session.token);
+        },
+    });
+}
+
+export function useTestCopilotKey() {
+    const { session } = useAuth();
+    return useMutation({
+        mutationFn: (key: string) => {
+            if (!session?.token) throw new Error("Not authenticated");
+            return api.testCopilotKey(key, session.token);
+        },
+    });
+}
+

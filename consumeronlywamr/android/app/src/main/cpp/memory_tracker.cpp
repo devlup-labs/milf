@@ -59,12 +59,27 @@ void MemoryTracker::RecordDeallocation(size_t bytes) {
        current / (1024 * 1024));
 }
 
+/**
+ * Returns net tracked bytes allocated specifically for WASM modules.
+ * Note: Lockless read using sequentially consistent atomic loads.
+ */
 size_t MemoryTracker::GetCurrentUsage() {
   size_t allocated = total_allocated_.load();
   size_t freed = total_freed_.load();
   return allocated > freed ? (allocated - freed) : 0;
 }
 
+/**
+ * Parses Linux Kernel procfs (`/proc/self/status`) for `VmRSS` (Resident Set Size).
+ *
+ * Research Rationale:
+ * - Unlike standard heap profiling (`mallinfo` or `sbrk`), VmRSS reflects actual physical
+ *   RAM pages mapped into the process's page table by the MMU, including:
+ *   1. Anonymous memory (WASM linear memory pages committed by jemalloc/scudo).
+ *   2. File-backed memory (shared libraries like libnative-lib.so and Android framework).
+ *   3. Shared memory mappings.
+ * - This provides the exact metric inspected by Android's LMKD when determining OOM kills.
+ */
 size_t MemoryTracker::GetRSSBytes() {
   std::ifstream status("/proc/self/status");
   if (!status.is_open()) {
@@ -87,6 +102,12 @@ size_t MemoryTracker::GetRSSBytes() {
   return 0;
 }
 
+/**
+ * Evaluates whether current RSS has crossed the high-watermark threshold (80% of MAX_TOTAL = 1.2 GB).
+ *
+ * If true, subsequent module loads/instantiations are aborted immediately to prevent
+ * an unrecoverable SIGKILL from Android's LMKD.
+ */
 bool MemoryTracker::IsNearLimit() {
   size_t rss = GetRSSBytes();
   size_t threshold =

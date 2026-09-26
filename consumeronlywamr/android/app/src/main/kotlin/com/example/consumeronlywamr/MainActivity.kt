@@ -10,18 +10,45 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
 
+/**
+ * MainActivity
+ *
+ * Serves as the primary entry point and UI coordinator for the application.
+ *
+ * Architecture Role:
+ * - Runs in the default application process (`com.example.consumeronlywamr`).
+ * - Acts as an IPC (Inter-Process Communication) gateway bridging Flutter's Dart layer
+ *   and the isolated native WASM execution service (`:wasm_engine`).
+ * - Uses [MethodChannel] to receive execution commands from Dart.
+ * - Forwards requests across the Android Binder IPC interface ([WasmServiceInterface])
+ *   to [WasmService].
+ * - Executes native/IPC work asynchronously using background threads to ensure the
+ *   Flutter UI thread remains responsive, marshaling responses back via [runOnUiThread].
+ */
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.consumeronlywamr/wasm"
     private var wasmService: WasmServiceInterface? = null
     private var isBound = false
 
+    /**
+     * IPC ServiceConnection callback monitor.
+     * Manages the Binder lifecycle connecting this Activity to [WasmService].
+     */
     private val connection =
             object : ServiceConnection {
+                /**
+                 * Invoked when the IPC Binder connection to [WasmService] has been established.
+                 * Unmarshals the raw [IBinder] into the type-safe [WasmServiceInterface] proxy.
+                 */
                 override fun onServiceConnected(className: ComponentName, service: IBinder) {
                     wasmService = WasmServiceInterface.Stub.asInterface(service)
                     isBound = true
                 }
 
+                /**
+                 * Invoked if the remote service process crashes or is killed by the OS.
+                 * Invalidates the local proxy reference.
+                 */
                 override fun onServiceDisconnected(arg0: ComponentName) {
                     wasmService = null
                     isBound = false
@@ -31,14 +58,16 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Bind to the isolated service
+        // Bind to the isolated background service hosting the WAMR runtime.
         val intent = Intent(this, WasmService::class.java)
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
 
+        // MethodChannel handler: Listens for method invocations dispatched from Flutter Dart.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler {
                 call,
                 result ->
             when (call.method) {
+                // Execute WASM binary with generic entrypoint (e.g. main/app_main) returning String log/output.
                 "runWasm" -> {
                     val wasmBytes = call.argument<ByteArray>("bytes")
                     if (wasmBytes != null && isBound && wasmService != null) {
@@ -56,6 +85,7 @@ class MainActivity : FlutterActivity() {
                         result.error("ERROR", "Service not bound or null bytes", null)
                     }
                 }
+                // Invokes an exported WASM function by symbol name, passing primitive integer parameters.
                 "invokeWasm" -> {
                     val bytes = call.argument<ByteArray>("bytes")
                     val func = call.argument<String>("funcName")
@@ -79,6 +109,7 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGS", "Missing arguments for invokeWasm", null)
                     }
                 }
+                // Invokes an exported WASM function passing a UTF-8 string payload (e.g., JSON) and returns string result.
                 "invokeWasmString" -> {
                     val bytes = call.argument<ByteArray>("bytes")
                     val func = call.argument<String>("funcName")
@@ -102,6 +133,7 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGS", "Missing arguments for invokeWasmString", null)
                     }
                 }
+                // Reads local file bytes from internal storage (filesDir) to provide assets/data to Flutter.
                 "readLocalFile" -> {
                     val name = call.argument<String>("name")
                     if (name != null) {
@@ -119,6 +151,7 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGS", "Missing file name", null)
                     }
                 }
+                // Advanced ABI Dispatcher: Passes raw binary payload into WASM linear memory and receives output bytes.
                 "invokeDataWasm" -> {
                     val bytes = call.argument<ByteArray>("bytes")
                     val func = call.argument<String>("funcName") // TODO: think about the convinient way for this or can be use something as lambda_handler
@@ -150,6 +183,18 @@ class MainActivity : FlutterActivity() {
                         )
                     }
                 }
+                // Retrieves hardware/OS unique Android ID for node identification in the distributed network.
+                "getDeviceId" -> {
+                    try {
+                        val androidId = android.provider.Settings.Secure.getString(
+                            contentResolver,
+                            android.provider.Settings.Secure.ANDROID_ID
+                        )
+                        result.success(androidId ?: "unknown_device")
+                    } catch (e: Exception) {
+                        result.error("DEVICE_ID_ERROR", e.toString(), null)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -157,6 +202,9 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * Cleans up IPC bindings when Activity is destroyed to prevent service leaks.
+     */
     override fun onDestroy() {
         super.onDestroy()
         if (isBound) {
